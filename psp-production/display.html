@@ -600,6 +600,12 @@
       const res    = await fetch("/.netlify/functions/calendar");
       const events = await res.json();
 
+      // Show debug info if present
+      if (events.debug) {
+        container.innerHTML = `<div class="ship-empty" style="font-size:.7rem;word-break:break-all;color:var(--muted)">Debug: ${JSON.stringify(events.rawResponse).substring(0, 800)}</div>`;
+        return;
+      }
+
       if (!events.length) {
         container.innerHTML = `<div class="ship-empty">No upcoming shipments in the next 30 days.</div>`;
         return;
