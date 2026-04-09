@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PSP Production Board</title>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Display:wght@400;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0e12;
+      --surface:   #141920;
+      --surface2:  #1a2230;
+      --border:    #1e2a38;
+      --text:      #e2eaf4;
+      --muted:     #4a6280;
+      --primary:   #7cb9ff;
+      --green:     #4caf7d;
+      --green-bg:  rgba(76,175,125,.12);
+      --amber:     #ffb300;
+      --amber-bg:  rgba(255,179,0,.1);
+      --red:       #f44336;
+      --red-bg:    rgba(244,67,54,.1);
+      --gold:      #ffd700;
+    }
+
+    @keyframes pulse       { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes slideUp     { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes breathe     { 0%,100%{opacity:.6} 50%{opacity:1} }
+    @keyframes celebrate   { 0%{box-shadow:0 0 0 0 rgba(76,175,125,.8)} 70%{box-shadow:0 0 0 20px rgba(76,175,125,0)} 100%{box-shadow:0 0 0 0 rgba(76,175,125,0)} }
+    @keyframes countUp     { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeIn      { from{opacity:0} to{opacity:1} }
+    @keyframes fadeOut     { from{opacity:1} to{opacity:0} }
+    @keyframes shimmer     { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+
+    html, body {
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    /* ── PIXEL SHIFT WRAPPER ── */
+    #pixel-shift {
+      width: 100vw; height: 100vh;
+      position: relative;
+      transition: transform 4s ease-in-out;
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ── SHARED HEADER ── */
+    header {
+      height: 7vh; min-height: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2vw;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .brand { font-family:'Google Sans Display',sans-serif; font-size:clamp(.9rem,1.4vw,1.5rem); font-weight:700; }
+    .brand span { color: var(--primary); }
+    .header-center { display:flex; flex-direction:column; align-items:center; gap:1px; }
+    .week-label { font-size:clamp(.55rem,.7vw,.8rem); font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+    .goal-label { font-size:clamp(.7rem,.9vw,1rem); font-weight:700; color:var(--primary); }
+    .clock-block { text-align:right; }
+    #clock-time  { font-family:'Roboto Mono',monospace; font-size:clamp(1rem,1.5vw,1.6rem); font-weight:500; line-height:1; }
+    #clock-date  { font-size:clamp(.55rem,.7vw,.75rem); color:var(--muted); margin-top:2px; }
+    #refresh-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green); margin-left:5px; vertical-align:middle; animation:pulse 2s infinite; }
+
+    /* ── SCREEN INDICATOR DOTS ── */
+    .screen-dots {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 100;
+    }
+    .screen-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background .3s;
+    }
+    .screen-dot.active { background: var(--primary); }
+
+    /* ══════════════════════════════════════════
+       PRODUCTION SCREEN
+    ══════════════════════════════════════════ */
+    #prod-main {
+      flex: 1;
+      padding: 1vh 1.2vw;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) minmax(180px, 1.1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: .8vh .8vw;
+      overflow: hidden;
+    }
+
+    /* DEPT CARD */
+    .dept-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: clamp(8px,1vw,14px);
+      padding: clamp(8px,.9vh,.9vh) clamp(10px,.9vw,1vw);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+    .dept-card.on-track { border-color:rgba(76,175,125,.4);  background:linear-gradient(150deg,var(--surface),rgba(76,175,125,.05)); }
+    .dept-card.close    { border-color:rgba(255,179,0,.4);   background:linear-gradient(150deg,var(--surface),rgba(255,179,0,.05)); }
+    .dept-card.behind   { border-color:rgba(244,67,54,.4);   background:linear-gradient(150deg,var(--surface),rgba(244,67,54,.05)); }
+    .dept-card.neutral  { border-color:var(--border); background:var(--surface); }
+    .dept-card.celebrate { animation: celebrate .8s ease 3; }
+
+    .dept-name {
+      font-size:clamp(.55rem,.65vw,.78rem); font-weight:700;
+      text-transform:uppercase; letter-spacing:.09em; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      padding-right:50px;
+    }
+    .status-tag {
+      position:absolute; top:clamp(6px,.6vh,.6vh); right:clamp(8px,.7vw,.7vw);
+      font-size:clamp(.48rem,.55vw,.62rem); font-weight:700;
+      text-transform:uppercase; letter-spacing:.07em;
+      padding:2px 7px; border-radius:99px;
+    }
+    .on-track .status-tag { background:var(--green-bg); color:var(--green); }
+    .close    .status-tag { background:var(--amber-bg); color:var(--amber); }
+    .behind   .status-tag { background:var(--red-bg);   color:var(--red);   }
+
+    .week-total {
+      font-family:'Google Sans Display',sans-serif;
+      font-size:clamp(1.6rem,2.8vw,3.2rem); font-weight:800; line-height:1;
+      margin:.2vh 0;
+      animation: countUp .6s ease both;
+    }
+    .on-track .week-total { color:var(--green); }
+    .close    .week-total { color:var(--amber); }
+    .behind   .week-total { color:var(--red); }
+    .neutral  .week-total { color:var(--primary); }
+
+    .goal-text { font-size:clamp(.55rem,.62vw,.72rem); color:var(--muted); font-weight:500; margin-bottom:.4vh; }
+
+    .progress-wrap { background:var(--surface2); border-radius:99px; height:clamp(5px,.5vh,8px); overflow:hidden; margin-bottom:.3vh; }
+    .progress-bar  { height:100%; border-radius:99px; transition:width 1.2s cubic-bezier(.4,0,.2,1); }
+    .on-track .progress-bar { background:var(--green); }
+    .close    .progress-bar { background:var(--amber); }
+    .behind   .progress-bar { background:var(--red); animation:breathe 2.5s ease-in-out infinite; }
+
+    .progress-labels { display:flex; justify-content:space-between; font-size:clamp(.5rem,.58vw,.68rem); color:var(--muted); margin-bottom:.4vh; }
+
+    .day-dots { display:flex; gap:clamp(3px,.3vw,5px); }
+    .day-dot  { flex:1; height:clamp(20px,2.2vh,28px); border-radius:5px; background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
+    .day-dot.has-data { background:rgba(124,185,255,.1); }
+    .day-name  { font-size:clamp(.42rem,.5vw,.58rem); font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); line-height:1; }
+    .day-count { font-size:clamp(.5rem,.58vw,.7rem); font-weight:700; color:var(--text); line-height:1; }
+    .day-dot.has-data .day-name { color:var(--primary); }
+
+    /* PERFORMER CARD */
+    .performer-card {
+      grid-column:5; grid-row:1/4;
+      background:var(--surface);
+      border:1px solid rgba(255,215,0,.3);
+      border-radius:clamp(8px,1vw,14px);
+      padding:1.5vh 1vw;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:1.2vh;
+      position:relative; overflow:hidden;
+      background:linear-gradient(160deg,var(--surface),rgba(255,215,0,.04));
+      animation: slideUp .5s ease both;
+    }
+    .performer-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,transparent,var(--gold),transparent); }
+    .perf-title  { font-size:clamp(.6rem,.7vw,.8rem); font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--gold); text-align:center; }
+    .perf-trophy { font-size:clamp(2rem,3.5vw,4rem); line-height:1; }
+    .perf-name   { font-family:'Google Sans Display',sans-serif; font-size:clamp(1.2rem,2vw,2.4rem); font-weight:800; color:var(--text); text-align:center; line-height:1.1; }
+    .perf-label  { font-size:clamp(.55rem,.65vw,.75rem); color:var(--muted); font-weight:500; text-align:center; }
+
+    /* ══════════════════════════════════════════
+       SHIPMENTS SCREEN
+    ══════════════════════════════════════════ */
+    #ship-main {
+      flex: 1;
+      padding: 2vh 3vw;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5vh;
+      overflow: hidden;
+    }
+
+    .ship-screen-title {
+      font-family: 'Google Sans Display', sans-serif;
+      font-size: clamp(1rem, 1.8vw, 2rem);
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ship-screen-title span { color: var(--primary); }
+
+    .ship-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.2vh 1.5vw;
+      align-content: start;
+      overflow: hidden;
+    }
+
+    .ship-card {
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 16px 20px;
+      border-left: 4px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      animation: slideUp .4s ease both;
+    }
+    .ship-card.urgent  { border-left-color: var(--red);   background: linear-gradient(135deg,var(--surface),rgba(244,67,54,.05)); }
+    .ship-card.soon    { border-left-color: var(--amber); background: linear-gradient(135deg,var(--surface),rgba(255,179,0,.05)); }
+    .ship-card.ok      { border-left-color: var(--green); background: linear-gradient(135deg,var(--surface),rgba(76,175,125,.05)); }
+
+    .ship-days {
+      font-size: clamp(.6rem,.8vw,.9rem);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .urgent .ship-days { color: var(--red); }
+    .soon   .ship-days { color: var(--amber); }
+    .ok     .ship-days { color: var(--green); }
+
+    .ship-title {
+      font-family: 'Google Sans Display', sans-serif;
+      font-size: clamp(.9rem,1.3vw,1.5rem);
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .ship-date {
+      font-size: clamp(.65rem,.75vw,.85rem);
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .ship-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: clamp(.8rem,1vw,1rem);
+    }
+
+    /* countdown for most urgent */
+    .ship-countdown {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+    .countdown-label { font-size:clamp(.6rem,.75vw,.85rem); color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.08em; }
+    .countdown-name  { font-family:'Google Sans Display',sans-serif; font-size:clamp(.9rem,1.2vw,1.4rem); font-weight:700; color:var(--text); }
+    .countdown-days  { font-family:'Google Sans Display',sans-serif; font-size:clamp(1.5rem,2.5vw,3rem); font-weight:800; color:var(--red); line-height:1; }
+    .countdown-unit  { font-size:clamp(.6rem,.75vw,.85rem); color:var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- PIXEL SHIFT WRAPPER -->
+<div id="pixel-shift">
+
+  <!-- ── SCREEN 1: PRODUCTION ── -->
+  <div class="screen active" id="screen-prod">
+    <header>
+      <div class="brand">PSP <span>Production</span></div>
+      <div class="header-center">
+        <div class="week-label" id="week-range">This Week</div>
+        <div class="goal-label" id="goal-display">Goal: 90 covers / day</div>
+      </div>
+      <div class="clock-block">
+        <div id="clock-time">--:--:--</div>
+        <div id="clock-date">Loading… <span id="refresh-dot"></span></div>
+      </div>
+    </header>
+    <div id="prod-main"></div>
+  </div>
+
+  <!-- ── SCREEN 2: SHIPMENTS ── -->
+  <div class="screen" id="screen-ship">
+    <header>
+      <div class="brand">PSP <span>Shipments</span></div>
+      <div class="header-center">
+        <div class="week-label">Upcoming</div>
+        <div class="goal-label">Next 30 Days</div>
+      </div>
+      <div class="clock-block">
+        <div id="clock-time2">--:--:--</div>
+        <div id="clock-date2"></div>
+      </div>
+    </header>
+    <div id="ship-main">
+      <div class="ship-empty" id="ship-loading">Loading shipments…</div>
+    </div>
+  </div>
+
+</div><!-- /pixel-shift -->
+
+<!-- SCREEN DOTS -->
+<div class="screen-dots">
+  <div class="screen-dot active" id="dot-0"></div>
+  <div class="screen-dot" id="dot-1"></div>
+</div>
+
+<script>
+  // ── CONFIG ───────────────────────────────────────────────────────────────
+  const DAILY_GOAL     = 90;
+  const PROD_DURATION  = 45000;  // ms on production screen
+  const SHIP_DURATION  = 15000;  // ms on shipments screen
+  const REFRESH_MS     = 2 * 60 * 1000;
+  const PIXEL_SHIFT_MS = 3 * 60 * 1000;
+
+  firebase.initializeApp({
+    apiKey:            "AIzaSyC4ZnWOG_PS0sh4XI8wWYfQLNG48LjeSVs",
+    authDomain:        "sewing-production-log.firebaseapp.com",
+    databaseURL:       "https://sewing-production-log-default-rtdb.firebaseio.com",
+    projectId:         "sewing-production-log",
+    storageBucket:     "sewing-production-log.firebasestorage.app",
+    messagingSenderId: "196320262022",
+    appId:             "1:196320262022:web:b35cc8a118e25da3735e07"
+  });
+  const db = firebase.database();
+
+  const DEPT_ORDER = [
+    "Bags","Skirt Prep","Prep (Handles, Ties, Hinges)",
+    "Plastics","Profile","Top Stitch","Closing","Zippers","Pillows","Joining","Repair"
+  ];
+
+  const NO_GOAL = ["Bags","Prep (Handles, Ties, Hinges)","Repair"];
+
+  const DIFFICULTY = {
+    "Bags":                         1.30,
+    "Skirt Prep":                   1.40,
+    "Prep (Handles, Ties, Hinges)": 0,
+    "Top Stitch":                   1.10,
+    "Profile":                      1.00,
+    "Closing":                      1.10,
+    "Plastics":                     0.80,
+    "Repair":                       0.75,
+    "Joining":                      0.40,
+    "Pillows":                      0.40,
+    "Zippers":                      0.35,
+  };
+
+  // ── CLOCK ────────────────────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const time = now.toLocaleTimeString("en-CA", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+    const date = now.toLocaleDateString("en-CA", { weekday:"long", month:"long", day:"numeric" });
+    document.getElementById("clock-time").textContent  = time;
+    document.getElementById("clock-time2").textContent = time;
+    document.getElementById("clock-date").innerHTML    = date + ` <span id="refresh-dot"></span>`;
+    document.getElementById("clock-date2").textContent = date;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ── DATE HELPERS ─────────────────────────────────────────────────────────
+  function todayStr() { return new Date().toLocaleDateString("en-CA"); }
+
+  function getWeekDates() {
+    const today = new Date();
+    const mon   = new Date(today);
+    mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      return d.toLocaleDateString("en-CA");
+    });
+  }
+
+  function daysElapsedThisWeek() {
+    const dow = new Date().getDay();
+    if (dow === 0 || dow === 6) return 5;
+    return dow;
+  }
+
+  // ── PIXEL SHIFT ──────────────────────────────────────────────────────────
+  function startPixelShift() {
+    const el = document.getElementById("pixel-shift");
+    setInterval(() => {
+      const x = Math.round((Math.random() - 0.5) * 6); // -3 to +3px
+      const y = Math.round((Math.random() - 0.5) * 6);
+      el.style.transform = `translate(${x}px, ${y}px)`;
+    }, PIXEL_SHIFT_MS);
+  }
+  startPixelShift();
+
+  // ── SCREEN ROTATION ──────────────────────────────────────────────────────
+  const screens = ["screen-prod", "screen-ship"];
+  const dots    = ["dot-0", "dot-1"];
+  let   current = 0;
+
+  function showScreen(idx) {
+    screens.forEach((id, i) => {
+      document.getElementById(id).classList.toggle("active", i === idx);
+      document.getElementById(dots[i]).classList.toggle("active", i === idx);
+    });
+    current = idx;
+  }
+
+  function scheduleNext() {
+    const duration = current === 0 ? PROD_DURATION : SHIP_DURATION;
+    setTimeout(() => {
+      const next = (current + 1) % screens.length;
+      showScreen(next);
+      if (next === 1) loadShipments(); // refresh shipments when switching to it
+      scheduleNext();
+    }, duration);
+  }
+  scheduleNext();
+
+  // ── COUNT-UP ANIMATION ───────────────────────────────────────────────────
+  function animateCount(el, target, duration = 800) {
+    const start = performance.now();
+    function step(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3); // ease-out cubic
+      el.textContent = Math.round(ease * target);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ── PRODUCTION RENDER ────────────────────────────────────────────────────
+  let prevTotals = {};
+
+  function renderProduction(rows) {
+    const weekDates = getWeekDates();
+    const daysIn    = daysElapsedThisWeek();
+    const weekGoal  = DAILY_GOAL * daysIn;
+
+    document.getElementById("week-range").textContent =
+      weekDates[0] + " — " + weekDates[4];
+    document.getElementById("goal-display").textContent =
+      `Goal: ${DAILY_GOAL} covers / day  ·  Week target so far: ${weekGoal}`;
+
+    const byDeptDate = {};
+    rows.forEach(r => {
+      if (!weekDates.includes(r.date)) return;
+      if (!byDeptDate[r.department]) byDeptDate[r.department] = {};
+      byDeptDate[r.department][r.date] = (byDeptDate[r.department][r.date] || 0) + r.quantity;
+    });
+
+    const byEmp = {};
+    rows.forEach(r => {
+      if (!weekDates.includes(r.date)) return;
+      const w = DIFFICULTY[r.department] || 1.0;
+      if (w > 0) byEmp[r.employee] = (byEmp[r.employee] || 0) + r.quantity * w;
+    });
+
+    const activeDepts = DEPT_ORDER.filter(d => byDeptDate[d]);
+    Object.keys(byDeptDate).forEach(d => { if (!activeDepts.includes(d)) activeDepts.push(d); });
+
+    const grid = document.getElementById("prod-main");
+
+    // Remove stale dept cards
+    [...grid.querySelectorAll(".dept-card")].forEach(c => {
+      if (!activeDepts.includes(c.dataset.dept)) c.remove();
+    });
+
+    activeDepts.forEach((dept, idx) => {
+      const dateMap   = byDeptDate[dept] || {};
+      const weekTotal = weekDates.reduce((s, d) => s + (dateMap[d] || 0), 0);
+      const pct       = Math.min((weekTotal / weekGoal) * 100, 100);
+      const ratio     = weekTotal / weekGoal;
+      const noGoal    = NO_GOAL.includes(dept);
+      const status    = noGoal ? "neutral" : (ratio >= 1 ? "on-track" : ratio >= 0.75 ? "close" : "behind");
+      const statusLbl = noGoal ? null : (ratio >= 1 ? "On Track" : ratio >= 0.75 ? "Close" : "Behind");
+
+      let card = grid.querySelector(`.dept-card[data-dept="${CSS.escape(dept)}"]`);
+      const isNew = !card;
+      if (isNew) {
+        card = document.createElement("div");
+        card.className = "dept-card";
+        card.dataset.dept = dept;
+        card.style.animationDelay = (idx * 0.04) + "s";
+        card.style.animation = "slideUp .4s ease both";
+      }
+
+      // Celebrate if just hit goal
+      const wasBelow = (prevTotals[dept] || 0) < weekGoal;
+      const nowAt    = weekTotal >= weekGoal;
+      if (!isNew && wasBelow && nowAt) {
+        card.classList.add("celebrate");
+        setTimeout(() => card.classList.remove("celebrate"), 3000);
+      }
+      prevTotals[dept] = weekTotal;
+
+      card.className = `dept-card ${status}`;
+      card.dataset.dept = dept;
+
+      card.innerHTML = `
+        <div class="dept-name">${dept}</div>
+        ${statusLbl ? `<div class="status-tag">${statusLbl}</div>` : ""}
+        <div class="week-total" data-target="${weekTotal}">0</div>
+        ${noGoal
+          ? `<div class="goal-text" style="opacity:.5">no daily target</div>`
+          : `<div class="goal-text">/ ${weekGoal} goal</div>`
+        }
+        ${noGoal ? "" : `
+        <div class="progress-wrap">
+          <div class="progress-bar" style="width:0%" data-pct="${pct}"></div>
+        </div>
+        <div class="progress-labels">
+          <span>${Math.round(pct)}%</span>
+          <span>${weekGoal - weekTotal > 0 ? (weekGoal - weekTotal) + " to go" : "✓ Goal reached"}</span>
+        </div>`}
+        <div class="day-dots">
+          ${weekDates.map((d, i) => {
+            const count = dateMap[d] || 0;
+            return `<div class="day-dot ${count > 0 ? "has-data" : ""}">
+              <span class="day-name">${["M","T","W","T","F"][i]}</span>
+              <span class="day-count">${count > 0 ? count : "—"}</span>
+            </div>`;
+          }).join("")}
+        </div>`;
+
+      if (isNew) {
+        const perf = grid.querySelector(".performer-card");
+        grid.insertBefore(card, perf);
+      }
+
+      // Animate count-up
+      const numEl = card.querySelector(".week-total");
+      if (numEl) animateCount(numEl, weekTotal, 900);
+
+      // Animate progress bar
+      const bar = card.querySelector(".progress-bar");
+      if (bar) setTimeout(() => bar.style.width = pct + "%", 100);
+    });
+
+    // Performer card
+    const sorted = Object.entries(byEmp).sort((a, b) => b[1] - a[1]);
+    let perfCard = grid.querySelector(".performer-card");
+    if (!perfCard) {
+      perfCard = document.createElement("div");
+      perfCard.className = "performer-card";
+      grid.appendChild(perfCard);
+    }
+
+    if (!sorted.length) {
+      perfCard.innerHTML = `
+        <div class="perf-title">⭐ Performer of the Week</div>
+        <div class="perf-trophy">🏆</div>
+        <div class="perf-label" style="color:var(--muted)">No data yet</div>`;
+    } else {
+      const [topName] = sorted[0];
+      perfCard.innerHTML = `
+        <div class="perf-title">⭐ Performer of the Week</div>
+        <div class="perf-trophy">🏆</div>
+        <div class="perf-name">${topName}</div>
+        <div class="perf-label">Outstanding work this week!</div>`;
+    }
+  }
+
+  // ── SHIPMENTS RENDER ──────────────────────────────────────────────────────
+  async function loadShipments() {
+    const container = document.getElementById("ship-main");
+
+    try {
+      const res    = await fetch("/.netlify/functions/calendar");
+      const events = await res.json();
+
+      if (!events.length) {
+        container.innerHTML = `<div class="ship-empty">No upcoming shipments in the next 30 days.</div>`;
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const parsed = events.map(e => {
+        const dateStr = e.start.date || e.start.dateTime;
+        const date    = new Date(dateStr);
+        date.setHours(0, 0, 0, 0);
+        const days = Math.round((date - today) / (1000 * 60 * 60 * 24));
+        const urgency = days <= 1 ? "urgent" : days <= 5 ? "soon" : "ok";
+        const daysLabel = days === 0 ? "TODAY" : days === 1 ? "TOMORROW" : `IN ${days} DAYS`;
+        return { title: e.summary || "Shipment", date, days, urgency, daysLabel, dateStr };
+      }).sort((a, b) => a.days - b.days);
+
+      // Most urgent countdown
+      const top = parsed[0];
+      const countdownHTML = `
+        <div class="ship-countdown">
+          <div>
+            <div class="countdown-label">Next Shipment</div>
+            <div class="countdown-name">${top.title}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="countdown-days">${top.days === 0 ? "TODAY" : top.days}</div>
+            ${top.days > 0 ? `<div class="countdown-unit">days away</div>` : ""}
+          </div>
+        </div>`;
+
+      const cardsHTML = parsed.map((e, i) => `
+        <div class="ship-card ${e.urgency}" style="animation-delay:${i*.06}s">
+          <div class="ship-days">${e.daysLabel}</div>
+          <div class="ship-title">${e.title}</div>
+          <div class="ship-date">${e.date.toLocaleDateString("en-CA", { weekday:"long", year:"numeric", month:"long", day:"numeric" })}</div>
+        </div>`).join("");
+
+      container.innerHTML = `
+        <div class="ship-screen-title">📦 Upcoming <span>Shipments</span></div>
+        ${countdownHTML}
+        <div class="ship-grid">${cardsHTML}</div>`;
+
+    } catch (err) {
+      // Show detailed error for debugging
+      try {
+        const res2   = await fetch("/.netlify/functions/calendar");
+        const text   = await res2.text();
+        container.innerHTML = `<div class="ship-empty" style="color:var(--muted);font-size:.8rem;word-break:break-all">Error: ${err.message}<br><br>Response: ${text.substring(0, 500)}</div>`;
+      } catch(e2) {
+        container.innerHTML = `<div class="ship-empty" style="color:var(--muted)">Function unreachable: ${err.message}</div>`;
+      }
+      console.error("Calendar fetch error:", err);
+    }
+  }
+
+  // ── PRODUCTION DATA LOAD ──────────────────────────────────────────────────
+  function loadProduction() {
+    const dates = getWeekDates();
+    db.ref("production_logs").once("value").then(snap => {
+      const rows = [];
+      snap.forEach(child => {
+        const v = child.val();
+        if (dates.includes(v.date)) rows.push(v);
+      });
+      renderProduction(rows);
+    });
+  }
+
+  // ── INIT ─────────────────────────────────────────────────────────────────
+  loadProduction();
+  loadShipments();
+
+  setInterval(loadProduction, REFRESH_MS);
+  // Shipments refresh every 30 min
+  setInterval(loadShipments, 30 * 60 * 1000);
+</script>
+</body>
+</html>
