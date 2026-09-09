@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Shared Care Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+  // ── Firebase config ─────────────────────────────────────────────
+  // Replace with your own project's values (see SETUP.md).
+  // While these placeholders remain, the app runs in LOCAL DEMO mode
+  // (data stays on this device only).
+  window.firebaseConfig = {
+    apiKey:            "REPLACE_API_KEY",
+    authDomain:        "REPLACE_AUTH_DOMAIN",
+    databaseURL:       "REPLACE_DATABASE_URL",
+    projectId:         "REPLACE_PROJECT_ID",
+    storageBucket:     "REPLACE_STORAGE_BUCKET",
+    messagingSenderId: "REPLACE_MESSAGING_SENDER_ID",
+    appId:             "REPLACE_APP_ID"
+  };
+</script>
+
+<style>
+/* ═══ Material 3 design tokens ═══ */
+:root {
+  color-scheme: light dark;
+  /* Light — M3 green-based scheme */
+  --primary:            #406836;
+  --on-primary:         #FFFFFF;
+  --primary-container:  #C0EFAF;
+  --on-primary-container:#002204;
+  --secondary:          #54634D;
+  --secondary-container:#D7E8CD;
+  --on-secondary-container:#121F0E;
+  --tertiary:           #386569;
+  --tertiary-container: #BCEBEF;
+  --on-tertiary-container:#002022;
+  --error:              #BA1A1A;
+  --on-error:           #FFFFFF;
+  --error-container:    #FFDAD6;
+  --on-error-container: #410002;
+  --surface:            #F8FAF0;
+  --surface-dim:        #D8DACF;
+  --on-surface:         #191D16;
+  --on-surface-variant: #43483E;
+  --surface-container-lowest:#FFFFFF;
+  --surface-container-low:#F2F4E9;
+  --surface-container:  #ECEEE3;
+  --surface-container-high:#E6E9DE;
+  --surface-container-highest:#E0E3D8;
+  --outline:            #73796C;
+  --outline-variant:    #C3C8BB;
+  --inverse-surface:    #2E312B;
+  --inverse-on-surface: #EFF2E7;
+  --scrim:              rgba(0,0,0,.42);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px 1px rgba(0,0,0,.12);
+  --shadow-2: 0 1px 2px rgba(0,0,0,.3), 0 2px 6px 2px rgba(0,0,0,.12);
+  --shadow-3: 0 4px 8px 3px rgba(0,0,0,.12), 0 1px 3px rgba(0,0,0,.3);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary:            #A5D395;
+    --on-primary:         #11380A;
+    --primary-container:  #285020;
+    --on-primary-container:#C0EFAF;
+    --secondary:          #BBCBB0;
+    --secondary-container:#3D4B36;
+    --on-secondary-container:#D7E8CD;
+    --tertiary:           #A0CFD3;
+    --tertiary-container: #1E4D51;
+    --on-tertiary-container:#BCEBEF;
+    --error:              #FFB4AB;
+    --on-error:           #690005;
+    --error-container:    #93000A;
+    --on-error-container: #FFDAD6;
+    --surface:            #11140E;
+    --surface-dim:        #11140E;
+    --on-surface:         #E1E4D8;
+    --on-surface-variant: #C3C8BB;
+    --surface-container-lowest:#0C0F09;
+    --surface-container-low:#191D16;
+    --surface-container:  #1D211A;
+    --surface-container-high:#282B24;
+    --surface-container-highest:#33362E;
+    --outline:            #8D9286;
+    --outline-variant:    #43483E;
+    --inverse-surface:    #E1E4D8;
+    --inverse-on-surface: #2E312B;
+    --scrim:              rgba(0,0,0,.6);
+  }
+}
+
+/* ═══ Base ═══ */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Roboto", system-ui, sans-serif;
+  background: var(--surface);
+  color: var(--on-surface);
+  min-height: 100dvh;
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+}
+[hidden] { display: none !important; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea, select { font-family: inherit; font-size: 1rem; color: inherit; }
+h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; margin: 0; }
+
+.mi { width: 24px; height: 24px; fill: currentColor; flex-shrink: 0; }
+.mi.sm { width: 20px; height: 20px; }
+
+/* ═══ Top app bar ═══ */
+.top-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 4px;
+  padding: calc(8px + env(safe-area-inset-top)) 8px 8px 16px;
+  background: var(--surface);
+}
+.top-bar .title-wrap { flex: 1; min-width: 0; }
+.top-bar h1 { font-size: 1.375rem; font-weight: 500; line-height: 1.3; }
+.top-bar .subtitle { font-size: .75rem; color: var(--on-surface-variant); }
+.mode-badge {
+  font-size: .6875rem; font-weight: 500; letter-spacing: .03em;
+  padding: 3px 10px; border-radius: 8px; margin-right: 4px;
+  border: 1px solid var(--outline-variant); color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+.mode-badge.live { background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; }
+
+/* ═══ Icon button ═══ */
+.icon-btn {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--on-surface-variant); transition: background .15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover, .icon-btn:focus-visible { background: color-mix(in srgb, var(--on-surface-variant) 10%, transparent); }
+.icon-btn:active { background: color-mix(in srgb, var(--on-surface-variant) 16%, transparent); }
+
+/* ═══ Layout ═══ */
+.view { max-width: 640px; margin: 0 auto; padding: 4px 16px 24px; }
+
+/* ═══ Cards ═══ */
+.card {
+  background: var(--surface-container-low);
+  border-radius: 16px; padding: 16px; margin-bottom: 12px;
+}
+.card.filled { background: var(--surface-container-highest); }
+.card.hero {
+  background: var(--primary-container); color: var(--on-primary-container);
+  text-align: center; padding: 28px 20px 24px;
+}
+.card h2 { font-size: 1rem; margin-bottom: 12px; color: var(--on-surface); }
+.card.hero h2 { color: inherit; opacity: .8; font-size: .875rem; font-weight: 500; margin-bottom: 4px; letter-spacing: .02em; }
+
+.hero-elapsed { font-family: "Google Sans","Roboto",sans-serif; font-size: 2.6rem; font-weight: 500; line-height: 1.15; }
+.hero-detail { font-size: .875rem; opacity: .85; margin-top: 6px; }
+
+/* ═══ Buttons ═══ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 24px; border-radius: 20px;
+  font-family: "Google Sans","Roboto",sans-serif;
+  font-size: .875rem; font-weight: 500; letter-spacing: .01em;
+  transition: box-shadow .15s, background .15s;
+}
+.btn.filled { background: var(--primary); color: var(--on-primary); }
+.btn.filled:hover { box-shadow: var(--shadow-1); }
+.btn.tonal { background: var(--secondary-container); color: var(--on-secondary-container); }
+.btn.text { color: var(--primary); padding: 0 12px; }
+.btn.outlined { border: 1px solid var(--outline); color: var(--primary); background: transparent; }
+.btn.error-tonal { background: var(--error-container); color: var(--on-error-container); }
+.btn:disabled { opacity: .38; cursor: default; box-shadow: none !important; }
+
+.btn-log {
+  width: 100%; height: 64px; border-radius: 20px; margin-top: 20px;
+  background: var(--primary); color: var(--on-primary);
+  font-family: "Google Sans","Roboto",sans-serif;
+  font-size: 1.25rem; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  box-shadow: var(--shadow-1); transition: box-shadow .15s, transform .1s;
+}
+.btn-log:active { transform: scale(.985); box-shadow: none; }
+.btn-log .em { font-size: 1.7rem; }
+
+/* ═══ Chips ═══ */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 14px; border-radius: 8px;
+  font-size: .8125rem; font-weight: 500;
+  border: 1px solid var(--outline-variant); color: var(--on-surface-variant);
+  background: transparent;
+}
+.chip.pa { background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; }
+.chip.pb { background: var(--tertiary-container); color: var(--on-tertiary-container); border-color: transparent; }
+.chip.status-open { background: var(--error-container); color: var(--on-error-container); border-color: transparent; }
+.chip.status-ack  { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; }
+.chip.status-done { background: var(--surface-container-highest); color: var(--on-surface-variant); border-color: transparent; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ═══ Stat row ═══ */
+.stat-row { display: flex; gap: 12px; }
+.stat-row .card { flex: 1; margin-bottom: 0; text-align: center; padding: 14px 8px; }
+.stat-num { font-family: "Google Sans","Roboto",sans-serif; font-size: 1.75rem; font-weight: 500; color: var(--primary); }
+.stat-label { font-size: .75rem; color: var(--on-surface-variant); margin-top: 2px; }
+
+/* ═══ Lists ═══ */
+.list-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 12px 4px; border-bottom: 1px solid var(--outline-variant);
+}
+.list-item:last-child { border-bottom: none; }
+.list-item .li-icon {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-container-highest); font-size: 1.15rem;
+  color: var(--on-surface-variant);
+}
+.list-item .li-body { flex: 1; min-width: 0; }
+.list-item .li-title { font-size: .9375rem; }
+.list-item .li-sub { font-size: .8125rem; color: var(--on-surface-variant); margin-top: 1px; }
+.list-item .li-end { font-size: .75rem; color: var(--on-surface-variant); white-space: nowrap; padding-top: 4px; }
+.voided .li-title { text-decoration: line-through; opacity: .6; }
+
+/* ═══ Calendar ═══ */
+.cal-header { display: flex; align-items: center; margin-bottom: 8px; }
+.cal-header h2 { flex: 1; font-size: 1.125rem; padding-left: 8px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { text-align: center; font-size: .6875rem; font-weight: 500; color: var(--on-surface-variant); padding: 6px 0 8px; }
+.cal-cell {
+  aspect-ratio: 1 / 1.15; border-radius: 12px; position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 6px; font-size: .8125rem;
+  background: var(--surface-container-low); color: var(--on-surface);
+  transition: background .12s; overflow: hidden; width: 100%;
+}
+.cal-cell:active { filter: brightness(.94); }
+.cal-cell.blank { background: transparent; pointer-events: none; }
+.cal-cell.pa { background: var(--primary-container); color: var(--on-primary-container); }
+.cal-cell.pb { background: var(--tertiary-container); color: var(--on-tertiary-container); }
+.cal-cell.today .day-num {
+  background: var(--primary); color: var(--on-primary);
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.cal-cell .day-num { height: 24px; display: flex; align-items: center; font-weight: 500; }
+.cal-cell .poop-badge { font-size: .72rem; margin-top: 2px; line-height: 1.1; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+/* ═══ FAB ═══ */
+.fab {
+  position: fixed; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom));
+  height: 56px; padding: 0 20px; border-radius: 16px; z-index: 15;
+  background: var(--primary-container); color: var(--on-primary-container);
+  box-shadow: var(--shadow-2);
+  display: flex; align-items: center; gap: 10px;
+  font-family: "Google Sans","Roboto",sans-serif; font-size: .9375rem; font-weight: 500;
+}
+.fab:active { box-shadow: var(--shadow-1); }
+
+/* ═══ Bottom navigation ═══ */
+.nav-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; background: var(--surface-container);
+  padding: 8px 0 calc(10px + env(safe-area-inset-bottom));
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: .75rem; font-weight: 500; color: var(--on-surface-variant);
+}
+.nav-item .ind {
+  width: 56px; height: 32px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.nav-item.active { color: var(--on-surface); }
+.nav-item.active .ind { background: var(--secondary-container); }
+.nav-item.active .ind .mi { color: var(--on-secondary-container); }
+
+/* ═══ Dialogs & sheets ═══ */
+.scrim {
+  position: fixed; inset: 0; background: var(--scrim); z-index: 40;
+  display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+}
+.scrim.sheet-host { align-items: flex-end; padding: 0; }
+.dialog {
+  background: var(--surface-container-high); border-radius: 28px;
+  padding: 24px; width: 100%; max-width: 400px; max-height: 86dvh; overflow-y: auto;
+  box-shadow: var(--shadow-3);
+}
+.dialog h2 { font-size: 1.375rem; font-weight: 500; margin-bottom: 14px; }
+.dialog .dlg-body { font-size: .875rem; color: var(--on-surface-variant); line-height: 1.5; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.sheet {
+  background: var(--surface-container); border-radius: 28px 28px 0 0;
+  width: 100%; max-width: 640px; margin: 0 auto;
+  padding: 8px 20px calc(24px + env(safe-area-inset-bottom));
+  max-height: 82dvh; overflow-y: auto; box-shadow: var(--shadow-3);
+}
+.sheet .drag { width: 32px; height: 4px; border-radius: 2px; background: var(--outline-variant); margin: 8px auto 16px; }
+.sheet h2 { font-size: 1.25rem; margin-bottom: 4px; }
+.sheet .sheet-sub { font-size: .8125rem; color: var(--on-surface-variant); margin-bottom: 14px; }
+
+/* ═══ Form fields ═══ */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: .75rem; font-weight: 500; color: var(--on-surface-variant); margin-bottom: 6px; }
+.field input[type=text], .field input[type=datetime-local], .field textarea, .field select {
+  width: 100%; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid var(--outline); background: var(--surface-container-lowest);
+  outline: none;
+}
+.field input:focus, .field textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.field textarea { resize: vertical; min-height: 72px; }
+
+.seg { display: flex; border: 1px solid var(--outline); border-radius: 20px; overflow: hidden; }
+.seg button {
+  flex: 1; height: 40px; font-size: .875rem; font-weight: 500;
+  color: var(--on-surface); border-left: 1px solid var(--outline);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.seg button:first-child { border-left: none; }
+.seg button.sel { background: var(--secondary-container); color: var(--on-secondary-container); }
+
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: .875rem; }
+.switch-row input { width: 20px; height: 20px; accent-color: var(--primary); }
+
+/* ═══ Snackbar ═══ */
+.snackbar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 60;
+  background: var(--inverse-surface); color: var(--inverse-on-surface);
+  border-radius: 8px; padding: 12px 18px; font-size: .875rem;
+  box-shadow: var(--shadow-2); max-width: min(90vw, 480px);
+  display: flex; align-items: center; gap: 16px;
+  animation: snack-in .2s ease-out;
+}
+@keyframes snack-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+.snackbar button { color: #B7F397; font-weight: 500; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { .snackbar button { color: #285020; } }
+
+/* ═══ Misc ═══ */
+.empty { text-align: center; color: var(--on-surface-variant); font-size: .875rem; padding: 32px 16px; }
+.empty .em { font-size: 2.2rem; display: block; margin-bottom: 8px; }
+.section-label { font-size: .8125rem; font-weight: 500; color: var(--on-surface-variant); margin: 18px 4px 8px; }
+.thread-msg { border-radius: 14px; background: var(--surface-container-high); padding: 10px 14px; margin-bottom: 8px; font-size: .9rem; }
+.thread-msg .meta { font-size: .72rem; color: var(--on-surface-variant); margin-bottom: 3px; }
+.fairness-note { font-size: .75rem; color: var(--on-surface-variant); text-align: center; padding: 8px 24px 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- Material icon paths (inline so icons never fail to load) -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></symbol>
+  <symbol id="i-forum" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.96 6.96 0 0 1-4.94-2.06l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
+  <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"/></symbol>
+</svg>
+
+<!-- ═══ Top app bar ═══ -->
+<header class="top-bar">
+  <div class="title-wrap">
+    <h1 id="app-title">Care Log</h1>
+    <div class="subtitle" id="app-subtitle">Shared co-parenting tracker</div>
+  </div>
+  <span class="mode-badge" id="mode-badge">DEMO</span>
+  <button class="icon-btn" id="btn-settings" aria-label="Settings"><svg class="mi"><use href="#i-settings"/></svg></button>
+</header>
+
+<!-- ═══ Home ═══ -->
+<main class="view" id="view-home">
+  <div class="card hero">
+    <h2>Last poo</h2>
+    <div class="hero-elapsed" id="hero-elapsed">—</div>
+    <div class="hero-detail" id="hero-detail">No entries yet</div>
+    <button class="btn-log" id="btn-quick-log"><span class="em">💩</span> Log poo now</button>
+    <div style="margin-top:8px">
+      <button class="btn text" id="btn-detail-log" style="color:var(--on-primary-container)">Log with time &amp; note…</button>
+    </div>
+  </div>
+
+  <div class="card" id="today-card">
+    <h2>Today</h2>
+    <div id="today-content" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div>
+  </div>
+
+  <div class="stat-row">
+    <div class="card"><div class="stat-num" id="stat-today">0</div><div class="stat-label">poos today</div></div>
+    <div class="card"><div class="stat-num" id="stat-week">0</div><div class="stat-label">last 7 days</div></div>
+    <div class="card"><div class="stat-num" id="stat-open-req">0</div><div class="stat-label">open requests</div></div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>Recent activity</h2>
+    <div id="home-recent"></div>
+  </div>
+
+  <p class="fairness-note">Both parents see the same records. Entries are permanent — they can be flagged as mistakes, but never edited or deleted.</p>
+</main>
+
+<!-- ═══ Calendar ═══ -->
+<main class="view" id="view-calendar" hidden>
+  <div class="cal-header">
+    <button class="icon-btn" id="cal-prev" aria-label="Previous month"><svg class="mi"><use href="#i-chevron-left"/></svg></button>
+    <h2 id="cal-title">Month</h2>
+    <button class="btn text" id="cal-today-btn">Today</button>
+    <button class="icon-btn" id="cal-next" aria-label="Next month"><svg class="mi"><use href="#i-chevron-right"/></svg></button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="cal-legend" id="cal-legend"></div>
+  <p class="fairness-note">Tap a day to see poo entries and set custody.</p>
+</main>
+
+<!-- ═══ Requests ═══ -->
+<main class="view" id="view-requests" hidden>
+  <div id="req-list"></div>
+</main>
+
+<!-- ═══ History ═══ -->
+<main class="view" id="view-history" hidden>
+  <div id="history-list"></div>
+</main>
+
+<button class="fab" id="fab-new-req" hidden><svg class="mi"><use href="#i-add"/></svg> New request</button>
+
+<!-- ═══ Bottom nav ═══ -->
+<nav class="nav-bar">
+  <button class="nav-item active" data-view="home"><span class="ind"><svg class="mi"><use href="#i-home"/></svg></span>Home</button>
+  <button class="nav-item" data-view="calendar"><span class="ind"><svg class="mi"><use href="#i-calendar"/></svg></span>Calendar</button>
+  <button class="nav-item" data-view="requests"><span class="ind"><svg class="mi"><use href="#i-forum"/></svg></span>Requests</button>
+  <button class="nav-item" data-view="history"><span class="ind"><svg class="mi"><use href="#i-history"/></svg></span>History</button>
+</nav>
+
+<!-- ═══ Identity dialog ═══ -->
+<div class="scrim" id="dlg-identity" hidden>
+  <div class="dialog">
+    <h2>Who's using this device?</h2>
+    <p class="dlg-body">Every entry you make is labeled with your name so both parents always know who logged what. Pick yourself:</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+      <button class="btn tonal" id="pick-a" style="height:52px;font-size:1rem"></button>
+      <button class="btn tonal" id="pick-b" style="height:52px;font-size:1rem"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Detailed poop log dialog ═══ -->
+<div class="scrim" id="dlg-poop" hidden>
+  <div class="dialog">
+    <h2>Log a poo</h2>
+    <div class="field">
+      <label for="poop-time">When it happened</label>
+      <input type="datetime-local" id="poop-time">
+    </div>
+    <div class="field">
+      <label for="poop-note">Note (optional — consistency, difficulty, etc.)</label>
+      <textarea id="poop-note" placeholder="e.g. normal, a bit hard, needed help…"></textarea>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn text" data-close="dlg-poop">Cancel</button>
+      <button class="btn filled" id="poop-save">Log it</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Day sheet ═══ -->
+<div class="scrim sheet-host" id="dlg-day" hidden>
+  <div class="sheet">
+    <div class="drag"></div>
+    <h2 id="day-title">Day</h2>
+    <div class="sheet-sub" id="day-sub"></div>
+
+    <div class="section-label">Custody</div>
+    <div class="seg" id="day-custody-seg">
+      <button data-cust="A"></button>
+      <button data-cust="B"></button>
+      <button data-cust="">Not set</button>
+    </div>
+    <label class="switch-row"><span>Also apply to the next 6 days (full week)</span><input type="checkbox" id="day-apply-week"></label>
+
+    <div class="section-label">Poo entries</div>
+    <div id="day-poops"></div>
+
+    <div class="dlg-actions">
+      <button class="btn text" data-close="dlg-day">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Void (flag mistake) dialog ═══ -->
+<div class="scrim" id="dlg-void" hidden>
+  <div class="dialog">
+    <h2>Flag as mistake?</h2>
+    <p class="dlg-body">The entry stays in the record (crossed out) so the history remains complete — nothing is ever deleted.</p>
+    <div class="field" style="margin-top:14px">
+      <label for="void-reason">Reason</label>
+      <input type="text" id="void-reason" placeholder="e.g. logged twice by accident">
+    </div>
+    <div class="dlg-actions">
+      <button class="btn text" data-close="dlg-void">Cancel</button>
+      <button class="btn error-tonal" id="void-confirm">Flag entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ New request dialog ═══ -->
+<div class="scrim" id="dlg-new-req" hidden>
+  <div class="dialog">
+    <h2>New request</h2>
+    <div class="field">
+      <label for="req-title">What do you need?</label>
+      <input type="text" id="req-title" placeholder="e.g. Swap Saturday, pack extra clothes…">
+    </div>
+    <div class="field">
+      <label for="req-note">Details (optional)</label>
+      <textarea id="req-note"></textarea>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn text" data-close="dlg-new-req">Cancel</button>
+      <button class="btn filled" id="req-save">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Request detail sheet ═══ -->
+<div class="scrim sheet-host" id="dlg-req" hidden>
+  <div class="sheet">
+    <div class="drag"></div>
+    <h2 id="req-d-title">Request</h2>
+    <div class="sheet-sub" id="req-d-sub"></div>
+    <div id="req-d-thread"></div>
+    <div class="field" style="margin-top:12px">
+      <label for="req-reply">Reply</label>
+      <textarea id="req-reply" style="min-height:56px"></textarea>
+    </div>
+    <div class="dlg-actions" style="justify-content:space-between">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn tonal" id="req-ack">Acknowledge</button>
+        <button class="btn tonal" id="req-done">Mark done</button>
+        <button class="btn tonal" id="req-reopen" hidden>Reopen</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn text" data-close="dlg-req">Close</button>
+        <button class="btn filled" id="req-send-reply">Reply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Settings dialog ═══ -->
+<div class="scrim" id="dlg-settings" hidden>
+  <div class="dialog">
+    <h2>Settings</h2>
+    <div class="field"><label for="set-child">Child's name</label><input type="text" id="set-child"></div>
+    <div class="field"><label for="set-a">Parent 1 name</label><input type="text" id="set-a"></div>
+    <div class="field"><label for="set-b">Parent 2 name</label><input type="text" id="set-b"></div>
+    <p class="dlg-body" id="settings-identity-line"></p>
+    <div class="dlg-actions" style="justify-content:space-between">
+      <button class="btn outlined" id="btn-switch-identity">Switch user</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn text" data-close="dlg-settings">Cancel</button>
+        <button class="btn filled" id="settings-save">Save</button>
+      </div>
+    </div>
+    <p class="dlg-body" style="margin-top:14px;font-size:.75rem" id="settings-mode-line"></p>
+  </div>
+</div>
+
+<div class="snackbar" id="snackbar" hidden><span id="snack-text"></span><button id="snack-action" hidden></button></div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   Shared Care Log — transparent co-parenting tracker.
+   Design principles:
+   - Both parents have identical access; nothing is hidden.
+   - Poo entries, request messages and the event feed are
+     append-only: they can be flagged as mistakes but never
+     edited or deleted (enforced server-side via the database
+     rules in SETUP.md when running in live mode).
+   - Every custody change and settings change is written to the
+     event feed so the full history is always visible to both.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Data store: Firebase RTDB when configured, localStorage demo otherwise ── */
+function makeLocalStore() {
+  const KEY = "carelog-demo-v1";
+  let data;
+  try { data = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { data = {}; }
+  const listeners = [];
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+    const snap = JSON.parse(JSON.stringify(data));
+    listeners.forEach(fn => fn(snap));
+  }
+  function setAt(path, val) {
+    const parts = path.split("/").filter(Boolean);
+    let o = data;
+    for (let i = 0; i < parts.length - 1; i++) { o[parts[i]] = o[parts[i]] || {}; o = o[parts[i]]; }
+    const last = parts[parts.length - 1];
+    if (val === null) delete o[last]; else o[last] = val;
+    save();
+  }
+  let seq = 0;
+  return {
+    mode: "demo",
+    now() { return Date.now(); },
+    serverTs() { return Date.now(); },
+    onRoot(cb) { listeners.push(cb); cb(JSON.parse(JSON.stringify(data))); },
+    push(path, val) {
+      const id = Date.now().toString(36) + "-" + (seq++).toString(36) + Math.random().toString(36).slice(2, 6);
+      setAt(path + "/" + id, val);
+      return id;
+    },
+    set(path, val) { setAt(path, val); }
+  };
+}
+
+function makeFirebaseStore() {
+  firebase.initializeApp(window.firebaseConfig);
+  const root = firebase.database().ref("coparenting");
+  return {
+    mode: "live",
+    now() { return Date.now(); },
+    serverTs() { return firebase.database.ServerValue.TIMESTAMP; },
+    onRoot(cb) { root.on("value", s => cb(s.val() || {})); },
+    push(path, val) { return root.child(path).push(val).key; },
+    set(path, val) { root.child(path).set(val); }
+  };
+}
+
+const firebaseReady =
+  typeof firebase !== "undefined" &&
+  window.firebaseConfig &&
+  !String(window.firebaseConfig.apiKey).includes("REPLACE");
+
+let store;
+try { store = firebaseReady ? makeFirebaseStore() : makeLocalStore(); }
+catch (e) { store = makeLocalStore(); }
+
+/* ── App state ── */
+let data = {};                      // synced root: settings, poops, custody, requests, events
+let identity = null;                // 'A' | 'B' — who is using this device
+let currentView = "home";
+let calY, calM;                     // calendar year/month
+let openDayStr = null;              // date open in day sheet
+let openReqId = null;               // request open in detail sheet
+let voidTargetId = null;            // poop id pending void
+const todayD = new Date();
+calY = todayD.getFullYear(); calM = todayD.getMonth();
+
+try { identity = localStorage.getItem("carelog-identity") || null; } catch (e) {}
+if (identity !== "A" && identity !== "B") identity = null;
+
+/* ── Helpers ── */
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const dateStr = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const todayStr = () => dateStr(new Date());
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function names() {
+  const s = (data.settings && data.settings.names) || {};
+  return { A: s.A || "Mom", B: s.B || "Dad" };
+}
+function childName() { return (data.settings && data.settings.child) || ""; }
+function nameOf(who) { return names()[who] || "Someone"; }
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+function fmtDate(ts) { return new Date(ts).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); }
+function fmtDateTime(ts) { return fmtDate(ts) + ", " + fmtTime(ts); }
+function fmtDayTitle(ds) {
+  const [y, m, d] = ds.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+function fmtElapsed(ms) {
+  if (ms < 0) ms = 0;
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return min + "m ago";
+  const h = Math.floor(min / 60);
+  if (h < 24) return h + "h " + (min % 60) + "m ago";
+  const d = Math.floor(h / 24);
+  return d + "d " + (h % 24) + "h ago";
+}
+function poopList() {
+  return Object.entries(data.poops || {})
+    .map(([id, p]) => ({ id, ...p }))
+    .sort((a, b) => b.at - a.at);
+}
+function eventList() {
+  return Object.entries(data.events || {})
+    .map(([id, e]) => ({ id, ...e }))
+    .sort((a, b) => b.at - a.at);
+}
+function requestList() {
+  return Object.entries(data.requests || {})
+    .map(([id, r]) => ({ id, ...r }))
+    .sort((a, b) => b.at - a.at);
+}
+function logEvent(type, summary) {
+  store.push("events", { type, summary, by: identity, at: store.now(), recordedAt: store.serverTs() });
+}
+function showSnack(text, actionLabel, actionFn) {
+  const bar = $("snackbar"), act = $("snack-action");
+  $("snack-text").textContent = text;
+  if (actionLabel) { act.textContent = actionLabel; act.hidden = false; act.onclick = () => { bar.hidden = true; actionFn(); }; }
+  else act.hidden = true;
+  bar.hidden = false;
+  clearTimeout(showSnack._t);
+  showSnack._t = setTimeout(() => { bar.hidden = true; }, 4000);
+}
+
+/* ── Identity ── */
+function ensureIdentity() {
+  if (identity) { $("dlg-identity").hidden = true; return true; }
+  const n = names();
+  $("pick-a").textContent = n.A;
+  $("pick-b").textContent = n.B;
+  $("dlg-identity").hidden = false;
+  return false;
+}
+function setIdentity(who, isSwitch) {
+  identity = who;
+  try { localStorage.setItem("carelog-identity", who); } catch (e) {}
+  $("dlg-identity").hidden = true;
+  if (isSwitch) logEvent("identity", nameOf(who) + " signed in on a device");
+  renderAll();
+}
+$("pick-a").onclick = () => setIdentity("A", true);
+$("pick-b").onclick = () => setIdentity("B", true);
+
+/* ── Poop logging ── */
+function logPoop(at, note) {
+  const entry = { at, by: identity, note: note || null, recordedAt: store.serverTs() };
+  store.push("poops", entry);
+  logEvent("poop", nameOf(identity) + " logged a poo" + (note ? " — “" + note + "”" : ""));
+  showSnack("Poo logged " + (Math.abs(at - Date.now()) < 60000 ? "for right now" : "for " + fmtDateTime(at)) + " ✓");
+}
+$("btn-quick-log").onclick = () => { if (ensureIdentity()) logPoop(Date.now(), null); };
+$("btn-detail-log").onclick = () => {
+  if (!ensureIdentity()) return;
+  const d = new Date();
+  $("poop-time").value = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  $("poop-time").max = $("poop-time").value;
+  $("poop-note").value = "";
+  $("dlg-poop").hidden = false;
+};
+$("poop-save").onclick = () => {
+  const t = $("poop-time").value;
+  const at = t ? new Date(t).getTime() : Date.now();
+  if (at > Date.now() + 60000) { showSnack("Time can't be in the future"); return; }
+  logPoop(at, $("poop-note").value.trim());
+  $("dlg-poop").hidden = true;
+};
+
+/* ── Void (flag mistake) ── */
+function openVoid(id) { voidTargetId = id; $("void-reason").value = ""; $("dlg-void").hidden = false; }
+$("void-confirm").onclick = () => {
+  const p = (data.poops || {})[voidTargetId];
+  if (!p) { $("dlg-void").hidden = true; return; }
+  const reason = $("void-reason").value.trim() || "flagged as mistake";
+  store.set("poops/" + voidTargetId + "/voided", { by: identity, at: store.now(), reason });
+  logEvent("void", nameOf(identity) + " flagged a poo entry from " + fmtDateTime(p.at) + " as a mistake (" + reason + ")");
+  $("dlg-void").hidden = true;
+  showSnack("Entry flagged — it stays visible in the record");
+};
+
+/* ── Custody ── */
+function setCustody(ds, who, silent) {
+  const cur = (data.custody || {})[ds];
+  const curParent = cur && cur.parent;
+  if ((curParent || "") === (who || "")) return;
+  store.set("custody/" + ds, who ? { parent: who, by: identity, at: store.now() } : null);
+  if (!silent) {
+    logEvent("custody", nameOf(identity) + " set " + fmtDayTitle(ds) + " as " +
+      (who ? nameOf(who) + "'s day" : "unassigned"));
+  }
+}
+$("day-custody-seg").addEventListener("click", ev => {
+  const btn = ev.target.closest("button");
+  if (!btn || !openDayStr || !ensureIdentity()) return;
+  const who = btn.dataset.cust || "";
+  const applyWeek = $("day-apply-week").checked;
+  const [y, m, d] = openDayStr.split("-").map(Number);
+  const span = applyWeek ? 7 : 1;
+  for (let i = 0; i < span; i++) setCustody(dateStr(new Date(y, m - 1, d + i)), who || null, i > 0);
+  if (applyWeek) {
+    logEvent("custody", nameOf(identity) + " set the week of " + fmtDayTitle(openDayStr) + " as " +
+      (who ? nameOf(who) + "'s" : "unassigned"));
+  }
+});
+
+/* ── Requests ── */
+$("fab-new-req").onclick = () => {
+  if (!ensureIdentity()) return;
+  $("req-title").value = ""; $("req-note").value = "";
+  $("dlg-new-req").hidden = false;
+};
+$("req-save").onclick = () => {
+  const title = $("req-title").value.trim();
+  if (!title) { showSnack("Give the request a short title"); return; }
+  const note = $("req-note").value.trim();
+  const id = store.push("requests", {
+    title, note: note || null, by: identity, at: store.now(),
+    recordedAt: store.serverTs(), status: "open"
+  });
+  logEvent("request", nameOf(identity) + " opened a request: “" + title + "”");
+  $("dlg-new-req").hidden = true;
+  openRequest(id);
+};
+function openRequest(id) {
+  openReqId = id;
+  renderRequestDetail();
+  $("dlg-req").hidden = false;
+}
+function reqStatusChange(status, label) {
+  const r = (data.requests || {})[openReqId];
+  if (!r || r.status === status) return;
+  store.set("requests/" + openReqId + "/status", status);
+  store.push("requests/" + openReqId + "/updates", { kind: "status", status, by: identity, at: store.now() });
+  logEvent("request", nameOf(identity) + " " + label + " “" + r.title + "”");
+}
+$("req-ack").onclick = () => { if (ensureIdentity()) reqStatusChange("ack", "acknowledged"); };
+$("req-done").onclick = () => { if (ensureIdentity()) reqStatusChange("done", "marked done:"); };
+$("req-reopen").onclick = () => { if (ensureIdentity()) reqStatusChange("open", "reopened"); };
+$("req-send-reply").onclick = () => {
+  if (!ensureIdentity()) return;
+  const text = $("req-reply").value.trim();
+  if (!text) return;
+  const r = (data.requests || {})[openReqId];
+  store.push("requests/" + openReqId + "/updates", { kind: "msg", text, by: identity, at: store.now(), recordedAt: store.serverTs() });
+  logEvent("request", nameOf(identity) + " replied on “" + (r ? r.title : "request") + "”");
+  $("req-reply").value = "";
+};
+
+/* ── Settings ── */
+$("btn-settings").onclick = () => {
+  const n = names();
+  $("set-child").value = childName();
+  $("set-a").value = n.A; $("set-b").value = n.B;
+  $("settings-identity-line").textContent = identity
+    ? "This device is signed in as " + nameOf(identity) + "."
+    : "No user selected on this device yet.";
+  $("settings-mode-line").textContent = store.mode === "live"
+    ? "Live mode: data is shared between both parents via Firebase and poo/history entries are append-only."
+    : "Demo mode: data is stored on this device only. Add your Firebase config (see SETUP.md) to share between both parents.";
+  $("dlg-settings").hidden = false;
+};
+$("settings-save").onclick = () => {
+  const n = names(), oldChild = childName();
+  const A = $("set-a").value.trim() || "Mom";
+  const B = $("set-b").value.trim() || "Dad";
+  const child = $("set-child").value.trim();
+  if (A !== n.A || B !== n.B || child !== oldChild) {
+    store.set("settings", { names: { A, B }, child: child || null });
+    if (identity) logEvent("settings", nameOf(identity) + " updated names/settings");
+  }
+  $("dlg-settings").hidden = true;
+};
+$("btn-switch-identity").onclick = () => {
+  $("dlg-settings").hidden = true;
+  identity = null;
+  try { localStorage.removeItem("carelog-identity"); } catch (e) {}
+  ensureIdentity();
+};
+
+/* ── Navigation ── */
+document.querySelectorAll(".nav-item").forEach(btn => {
+  btn.onclick = () => switchView(btn.dataset.view);
+});
+function switchView(v) {
+  currentView = v;
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+  ["home", "calendar", "requests", "history"].forEach(name => { $("view-" + name).hidden = name !== v; });
+  $("fab-new-req").hidden = v !== "requests";
+  renderAll();
+}
+
+/* ── Dialog close buttons + scrim tap ── */
+document.querySelectorAll("[data-close]").forEach(b => { b.onclick = () => { $(b.dataset.close).hidden = true; }; });
+document.querySelectorAll(".scrim").forEach(s => {
+  s.addEventListener("click", ev => { if (ev.target === s && s.id !== "dlg-identity") s.hidden = true; });
+});
+
+/* ── Calendar controls ── */
+$("cal-prev").onclick = () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCalendar(); };
+$("cal-next").onclick = () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCalendar(); };
+$("cal-today-btn").onclick = () => { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); renderCalendar(); };
+
+/* ═══ Rendering ═══ */
+function renderAll() {
+  renderHeader();
+  renderHome();
+  renderCalendar();
+  renderRequests();
+  renderHistory();
+  if (openDayStr && !$("dlg-day").hidden) renderDaySheet();
+  if (openReqId && !$("dlg-req").hidden) renderRequestDetail();
+}
+
+function renderHeader() {
+  const c = childName();
+  $("app-title").textContent = c ? c + "'s Care Log" : "Care Log";
+  const who = identity ? " · you are " + nameOf(identity) : "";
+  $("app-subtitle").textContent = "Shared co-parenting tracker" + who;
+  const badge = $("mode-badge");
+  badge.textContent = store.mode === "live" ? "SHARED" : "DEMO";
+  badge.classList.toggle("live", store.mode === "live");
+}
+
+function renderHome() {
+  const poops = poopList().filter(p => !p.voided);
+  const last = poops[0];
+  if (last) {
+    $("hero-elapsed").textContent = fmtElapsed(Date.now() - last.at);
+    $("hero-detail").textContent = "Logged by " + nameOf(last.by) + " · " + fmtDateTime(last.at) +
+      (last.note ? " · “" + last.note + "”" : "");
+  } else {
+    $("hero-elapsed").textContent = "—";
+    $("hero-detail").textContent = "No poos logged yet. Tap the button when it happens!";
+  }
+
+  // Today card
+  const ds = todayStr();
+  const cust = (data.custody || {})[ds];
+  const n = names();
+  let html = "";
+  if (cust && cust.parent) {
+    html += '<span class="chip ' + (cust.parent === "A" ? "pa" : "pb") + '">' +
+      '🧒 With ' + esc(nameOf(cust.parent)) + " today</span>";
+  } else {
+    html += '<span class="chip">Custody not set for today</span>';
+  }
+  const todayPoops = poops.filter(p => dateStr(new Date(p.at)) === ds);
+  html += '<span class="chip">💩 ' + todayPoops.length + " today</span>";
+  $("today-content").innerHTML = html;
+
+  // Stats
+  $("stat-today").textContent = todayPoops.length;
+  const weekAgo = Date.now() - 7 * 864e5;
+  $("stat-week").textContent = poops.filter(p => p.at >= weekAgo).length;
+  $("stat-open-req").textContent = requestList().filter(r => r.status !== "done").length;
+
+  // Recent activity
+  const ev = eventList().slice(0, 4);
+  $("home-recent").innerHTML = ev.length
+    ? ev.map(e => renderEventItem(e)).join("")
+    : '<div class="empty" style="padding:12px">Nothing yet — activity from both parents shows up here.</div>';
+}
+
+const EVENT_ICONS = { poop: "💩", custody: "🏠", request: "💬", void: "🚩", settings: "⚙️", identity: "👤" };
+function renderEventItem(e) {
+  return '<div class="list-item">' +
+    '<div class="li-icon">' + (EVENT_ICONS[e.type] || "📌") + "</div>" +
+    '<div class="li-body"><div class="li-title">' + esc(e.summary) + "</div>" +
+    '<div class="li-sub">' + fmtDateTime(e.at) + "</div></div></div>";
+}
+
+function renderCalendar() {
+  const n = names();
+  const first = new Date(calY, calM, 1);
+  $("cal-title").textContent = first.toLocaleDateString([], { month: "long", year: "numeric" });
+
+  const poopsByDay = {};
+  poopList().forEach(p => { if (!p.voided) { const k = dateStr(new Date(p.at)); poopsByDay[k] = (poopsByDay[k] || 0) + 1; } });
+  const custody = data.custody || {};
+  const tStr = todayStr();
+
+  let html = ["S", "M", "T", "W", "T", "F", "S"].map(d => '<div class="cal-dow">' + d + "</div>").join("");
+  for (let i = 0; i < first.getDay(); i++) html += '<div class="cal-cell blank"></div>';
+  const daysInMonth = new Date(calY, calM + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = calY + "-" + pad(calM + 1) + "-" + pad(d);
+    const cust = custody[ds];
+    const cls = ["cal-cell"];
+    if (cust && cust.parent === "A") cls.push("pa");
+    if (cust && cust.parent === "B") cls.push("pb");
+    if (ds === tStr) cls.push("today");
+    const count = poopsByDay[ds] || 0;
+    html += '<button class="' + cls.join(" ") + '" data-day="' + ds + '">' +
+      '<span class="day-num">' + d + "</span>" +
+      (count ? '<span class="poop-badge">💩' + (count > 1 ? "×" + count : "") + "</span>" : "") +
+      "</button>";
+  }
+  $("cal-grid").innerHTML = html;
+  $("cal-grid").querySelectorAll("[data-day]").forEach(cell => {
+    cell.onclick = () => openDay(cell.dataset.day);
+  });
+  $("cal-legend").innerHTML =
+    '<span class="chip pa"><span class="dot" style="background:var(--on-primary-container)"></span>' + esc(n.A) + "'s day</span>" +
+    '<span class="chip pb"><span class="dot" style="background:var(--on-tertiary-container)"></span>' + esc(n.B) + "'s day</span>" +
+    '<span class="chip">💩 = poo logged</span>';
+}
+
+function openDay(ds) {
+  openDayStr = ds;
+  $("day-apply-week").checked = false;
+  renderDaySheet();
+  $("dlg-day").hidden = false;
+}
+function renderDaySheet() {
+  const ds = openDayStr;
+  const n = names();
+  $("day-title").textContent = fmtDayTitle(ds);
+  const cust = (data.custody || {})[ds];
+  $("day-sub").textContent = cust && cust.parent
+    ? nameOf(cust.parent) + "'s day (set by " + nameOf(cust.by) + ")"
+    : "Custody not set";
+  const seg = $("day-custody-seg").querySelectorAll("button");
+  seg[0].textContent = n.A; seg[1].textContent = n.B;
+  seg.forEach(b => b.classList.toggle("sel", (b.dataset.cust || "") === ((cust && cust.parent) || "")));
+
+  const dayPoops = poopList().filter(p => dateStr(new Date(p.at)) === ds);
+  $("day-poops").innerHTML = dayPoops.length
+    ? dayPoops.map(p =>
+        '<div class="list-item' + (p.voided ? " voided" : "") + '">' +
+        '<div class="li-icon">💩</div>' +
+        '<div class="li-body"><div class="li-title">' + fmtTime(p.at) + " · " + esc(nameOf(p.by)) + "</div>" +
+        '<div class="li-sub">' + (p.note ? esc(p.note) : "") +
+        (p.voided ? ' <span style="color:var(--error)">flagged: ' + esc(p.voided.reason) + "</span>" : "") + "</div></div>" +
+        (!p.voided ? '<button class="icon-btn" data-void="' + p.id + '" aria-label="Flag as mistake"><svg class="mi sm"><use href="#i-flag"/></svg></button>' : "") +
+        "</div>").join("")
+    : '<div class="empty" style="padding:10px">No poo entries this day.</div>';
+  $("day-poops").querySelectorAll("[data-void]").forEach(b => {
+    b.onclick = () => { if (ensureIdentity()) openVoid(b.dataset.void); };
+  });
+}
+
+function renderRequests() {
+  const list = requestList();
+  const STATUS = { open: ["Open", "status-open"], ack: ["Acknowledged", "status-ack"], done: ["Done", "status-done"] };
+  $("req-list").innerHTML = list.length
+    ? list.map(r => {
+        const s = STATUS[r.status] || STATUS.open;
+        const updates = Object.values(r.updates || {}).sort((a, b) => a.at - b.at);
+        const lastMsg = updates.filter(u => u.kind === "msg").pop();
+        return '<button class="card" data-req="' + r.id + '" style="width:100%;text-align:left;display:block">' +
+          '<div style="display:flex;align-items:center;gap:10px;justify-content:space-between">' +
+          '<div style="font-size:1rem;font-weight:500;font-family:\'Google Sans\',Roboto,sans-serif">' + esc(r.title) + "</div>" +
+          '<span class="chip ' + s[1] + '" style="height:26px">' + s[0] + "</span></div>" +
+          '<div style="font-size:.8125rem;color:var(--on-surface-variant);margin-top:6px">' +
+          esc(nameOf(r.by)) + " · " + fmtDateTime(r.at) +
+          (lastMsg ? "<br>Last reply (" + esc(nameOf(lastMsg.by)) + "): " + esc(lastMsg.text.slice(0, 80)) : "") +
+          "</div></button>";
+      }).join("")
+    : '<div class="empty"><span class="em">💬</span>No requests yet.<br>Use “New request” for swaps, supplies, pickups — anything either of you needs.</div>';
+  $("req-list").querySelectorAll("[data-req]").forEach(b => { b.onclick = () => openRequest(b.dataset.req); });
+}
+
+function renderRequestDetail() {
+  const r = (data.requests || {})[openReqId];
+  if (!r) { $("dlg-req").hidden = true; return; }
+  $("req-d-title").textContent = r.title;
+  $("req-d-sub").textContent = "Opened by " + nameOf(r.by) + " · " + fmtDateTime(r.at);
+  let html = "";
+  if (r.note) html += '<div class="thread-msg"><div class="meta">' + esc(nameOf(r.by)) + " · " + fmtDateTime(r.at) + "</div>" + esc(r.note) + "</div>";
+  const updates = Object.values(r.updates || {}).sort((a, b) => a.at - b.at);
+  updates.forEach(u => {
+    if (u.kind === "msg") {
+      html += '<div class="thread-msg"><div class="meta">' + esc(nameOf(u.by)) + " · " + fmtDateTime(u.at) + "</div>" + esc(u.text) + "</div>";
+    } else if (u.kind === "status") {
+      const label = { open: "reopened", ack: "acknowledged", done: "marked done" }[u.status] || u.status;
+      html += '<div class="thread-msg" style="background:transparent;border:1px dashed var(--outline-variant)"><div class="meta">' +
+        esc(nameOf(u.by)) + " " + label + " · " + fmtDateTime(u.at) + "</div></div>";
+    }
+  });
+  $("req-d-thread").innerHTML = html || '<div class="empty" style="padding:10px">No replies yet.</div>';
+  $("req-ack").hidden = r.status !== "open";
+  $("req-done").hidden = r.status === "done";
+  $("req-reopen").hidden = r.status !== "done";
+}
+
+function renderHistory() {
+  const ev = eventList();
+  if (!ev.length) {
+    $("history-list").innerHTML = '<div class="empty"><span class="em">📜</span>The full, permanent record of everything both parents do in this app.</div>';
+    return;
+  }
+  let html = "", lastDay = "";
+  ev.forEach(e => {
+    const day = fmtDate(e.at);
+    if (day !== lastDay) { html += '<div class="section-label">' + day + "</div>"; lastDay = day; }
+    html += renderEventItem(e);
+  });
+  $("history-list").innerHTML = '<div class="card">' + html + "</div>";
+}
+
+/* ── Boot ── */
+store.onRoot(snap => { data = snap || {}; renderAll(); });
+setInterval(() => { if (currentView === "home") renderHome(); }, 30000);
+ensureIdentity();
+renderAll();
+</script>
+</body>
+</html>
