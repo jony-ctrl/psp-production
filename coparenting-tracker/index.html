@@ -283,6 +283,8 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
   position: fixed; inset: 0; background: var(--scrim); z-index: 40;
   display: flex; align-items: center; justify-content: center; padding: 24px 16px;
 }
+.scrim.gate { background: var(--surface); z-index: 50; }
+body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-settings { display: none !important; }
 .scrim.sheet-host { align-items: flex-end; padding: 0; }
 .dialog {
   background: var(--surface-container-high); border-radius: 28px;
@@ -486,7 +488,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
 </nav>
 
 <!-- ═══ Sign-in dialog (live mode) ═══ -->
-<div class="scrim" id="dlg-auth" hidden>
+<div class="scrim gate" id="dlg-auth" hidden>
   <div class="dialog">
     <h2 id="auth-title">Sign in</h2>
     <p class="dlg-body">Care Log is private to you two. Each entry is permanently tied to the signed-in account that made it.</p>
@@ -508,7 +510,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
 </div>
 
 <!-- ═══ Role claim dialog (live mode, once per account) ═══ -->
-<div class="scrim" id="dlg-claim" hidden>
+<div class="scrim gate" id="dlg-claim" hidden>
   <div class="dialog">
     <h2>Which parent are you?</h2>
     <p class="dlg-body">This permanently links your account to your side of the record. Each side can only ever be claimed by one account.</p>
@@ -523,7 +525,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
 </div>
 
 <!-- ═══ Identity dialog (demo/preview mode only) ═══ -->
-<div class="scrim" id="dlg-identity" hidden>
+<div class="scrim gate" id="dlg-identity" hidden>
   <div class="dialog">
     <h2>Who's using this device?</h2>
     <p class="dlg-body">Every entry you make is labeled with your name so both parents always know who logged what. Pick yourself:</p>
@@ -864,20 +866,27 @@ let authState = null;
 let authMode = "signin";
 function setupAuth() {
   if (!store.authApi) { ensureIdentity(); return; }
+  // Locked until an account is signed in AND has claimed a side; nothing
+  // of the app is rendered behind the gate. (The database rules are the
+  // real wall — signed-out clients get no data regardless of the UI.)
+  document.body.classList.add("locked");
   store.authApi.onState(st => {
     authState = st;
     if (!st.user) {
       identity = null;
       data = {};
+      document.body.classList.add("locked");
       $("dlg-claim").hidden = true;
       $("dlg-auth").hidden = false;
     } else if (!st.member) {
       identity = null;
+      document.body.classList.add("locked");
       $("dlg-auth").hidden = true;
       renderClaim(st);
       $("dlg-claim").hidden = false;
     } else {
       identity = st.member.role;
+      document.body.classList.remove("locked");
       $("dlg-auth").hidden = true;
       $("dlg-claim").hidden = true;
     }
@@ -1151,7 +1160,8 @@ function switchView(v) {
 /* ── Dialog close buttons + scrim tap ── */
 document.querySelectorAll("[data-close]").forEach(b => { b.onclick = () => { $(b.dataset.close).hidden = true; }; });
 document.querySelectorAll(".scrim").forEach(s => {
-  s.addEventListener("click", ev => { if (ev.target === s && s.id !== "dlg-identity") s.hidden = true; });
+  // Gate scrims (sign-in, role claim, identity) can never be tap-dismissed.
+  s.addEventListener("click", ev => { if (ev.target === s && !s.classList.contains("gate")) s.hidden = true; });
 });
 
 /* ── Calendar controls ── */
