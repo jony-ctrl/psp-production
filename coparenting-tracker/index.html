@@ -366,6 +366,11 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
 .tpl-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .tpl { text-align: left; border: 1px solid var(--outline-variant); border-radius: 12px; padding: 12px 14px; font-size: .9rem; transition: background .12s; }
 .tpl.sel { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; font-weight: 500; }
+.rule { display: flex; gap: 10px; padding: 7px 0; font-size: .8125rem; color: var(--on-surface-variant); line-height: 1.45; }
+.rule .r-em { flex-shrink: 0; }
+.rule b { color: var(--on-surface); font-weight: 500; }
+.conduct-note { display: flex; gap: 8px; align-items: flex-start; font-size: .75rem; color: var(--on-surface-variant); line-height: 1.45; margin: 2px 0 10px; }
+.conduct-note .r-em { flex-shrink: 0; }
 .fairness-note { font-size: .75rem; color: var(--on-surface-variant); text-align: center; padding: 8px 24px 0; line-height: 1.5; }
 </style>
 </head>
@@ -451,6 +456,17 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
       </div>
     </div>
   </div>
+
+  <div class="card">
+    <h2 style="display:flex;align-items:center;gap:8px;margin-bottom:6px">Adrian's ground rules</h2>
+    <div style="font-size:.75rem;color:var(--on-surface-variant);margin-bottom:8px">Same rules for both of you. I'll nudge you about them, but I can't enforce them — that part is on you two.</div>
+    <div class="rule"><span class="r-em">🧒</span><span><b>Keep it about <span class="child-ref">your son</span>.</b> Requests and replies are for coordinating his care — not for rehashing disagreements with each other.</span></div>
+    <div class="rule"><span class="r-em">🕊️</span><span><b>Stay civil.</b> No name-calling, blame, or sarcasm. Upset? Wait an hour before you send.</span></div>
+    <div class="rule"><span class="r-em">⏱️</span><span><b>Reply within a day.</b> Even "let me think about it" counts — silence stalls things for him.</span></div>
+    <div class="rule"><span class="r-em">📅</span><span><b>Ask early, not last-minute.</b> Schedule changes go smoother with notice, and the agreed schedule stands until the other parent agrees to a change.</span></div>
+    <div class="rule"><span class="r-em">📜</span><span><b>Every word here is permanent</b> and carries your name. Write as if someone you both respect will read it someday — because they might.</span></div>
+  </div>
+
   <div id="req-list"></div>
 </main>
 
@@ -594,6 +610,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
       <label for="req-note">Anything Adrian should add? (dates, details — optional)</label>
       <textarea id="req-note"></textarea>
     </div>
+    <div class="conduct-note"><span class="r-em">🕊️</span><span>Quick reminder: keep it civil and about <span class="child-ref">your son</span>. What you send is permanent, and it carries your name.</span></div>
     <div class="dlg-actions">
       <button class="btn text" data-close="dlg-new-req">Cancel</button>
       <button class="btn filled" id="req-save">Send via Adrian</button>
@@ -612,6 +629,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
       <label for="req-reply">Reply</label>
       <textarea id="req-reply" style="min-height:56px"></textarea>
     </div>
+    <div class="conduct-note"><span class="r-em">🕊️</span><span>Adrian's reminder: civil, about <span class="child-ref">your son</span>, and permanent. Upset? Wait an hour before you send.</span></div>
     <div class="dlg-actions" style="justify-content:space-between">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn tonal" id="req-ack">Acknowledge</button>
@@ -1154,6 +1172,7 @@ function renderAll() {
 
 function renderHeader() {
   const c = childName();
+  document.querySelectorAll(".child-ref").forEach(el => { el.textContent = c || "your son"; });
   $("app-title").textContent = c ? c + "'s Care Log" : "Care Log";
   const who = identity ? " · you are " + nameOf(identity) : "";
   $("app-subtitle").textContent = "Shared co-parenting tracker" + who;
