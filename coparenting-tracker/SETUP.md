@@ -55,7 +55,17 @@ Open `index.html`, find the `window.firebaseConfig` block near the top, and
 replace the `REPLACE_*` placeholders with your values (including
 `databaseURL` from the Realtime Database page).
 
-## Step 3 — Database rules (this is what makes it append-only)
+## Step 3 — Enable sign-in
+
+In the Firebase console: **Authentication** → **Get started** →
+**Sign-in method** → enable **Email/Password** (just the first toggle;
+leave "Email link" off).
+
+Each parent creates their own account in the app (email + password) and
+then claims their side of the record — Mom or Dad. A side can only ever
+be claimed by one account, and the claim is permanent.
+
+## Step 4 — Database rules (append-only + accounts)
 
 In **Realtime Database → Rules**, paste:
 
@@ -63,23 +73,51 @@ In **Realtime Database → Rules**, paste:
 {
   "rules": {
     "coparenting": {
-      ".read": true,
-      "settings": { ".write": true },
-      "custody":  { "$day": { ".write": true } },
+      ".read": "auth != null && root.child('coparenting').child('members').child(auth.uid).exists()",
+      "roles": {
+        ".read": "auth != null",
+        "$role": {
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && ($role === 'A' || $role === 'B')"
+        }
+      },
+      "members": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('coparenting').child('roles').child(newData.child('role').val()).val() === auth.uid"
+        }
+      },
+      "settings": {
+        ".write": "auth != null && root.child('coparenting').child('members').child(auth.uid).exists()"
+      },
+      "custody": {
+        "$day": {
+          ".write": "auth != null && root.child('coparenting').child('members').child(auth.uid).exists()"
+        }
+      },
       "poops": {
         "$id": {
-          ".write": "!data.exists()",
-          "voided": { ".write": "!data.exists()" }
+          ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()",
+          "voided": {
+            ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()"
+          }
         }
       },
       "events": {
-        "$id": { ".write": "!data.exists()" }
+        "$id": {
+          ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()"
+        }
       },
       "requests": {
         "$id": {
-          ".write": "!data.exists()",
-          "status":  { ".write": true },
-          "updates": { "$uid": { ".write": "!data.exists()" } }
+          ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()",
+          "status": {
+            ".write": "auth != null && root.child('coparenting').child('members').child(auth.uid).exists()"
+          },
+          "updates": {
+            "$upd": {
+              ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()"
+            }
+          }
         }
       }
     }
@@ -89,19 +127,21 @@ In **Realtime Database → Rules**, paste:
 
 What this enforces, for **everyone** including the person who set it up:
 
+- Only the two claimed accounts can read or write the record at all.
 - A poo entry, history event, or request message can be **created once and
   never changed or deleted** (`.write` only when no data exists yet).
+- **Attribution is server-enforced**: an entry's "who logged this" field
+  must match the role of the signed-in account writing it — Mom's account
+  cannot create entries labeled as Dad's, or vice versa.
 - The only thing you can add to an existing poo entry is a one-time
   `voided` flag — the entry stays visible, crossed out.
-- Custody days and request statuses stay editable, but the app writes a
-  history event for every change, and those events are immutable.
+- Custody days and request statuses stay editable by either parent, but
+  the app writes a history event for every change, and those events are
+  immutable.
+- Each side (Mom/Dad) can be claimed by exactly one account, once, and
+  an account can't claim a side as someone else.
 
-> Note: anyone with the URL can read/write within these rules. For two
-> parents sharing a private link that's usually acceptable; if you want
-> real accounts, add Firebase Authentication and change `true` to
-> `auth != null` in the rules above.
-
-## Step 4 — Deploy
+## Step 5 — Deploy
 
 Any static host works:
 
@@ -110,11 +150,12 @@ Any static host works:
   publish directory `coparenting-tracker`
 - Or GitHub Pages, Firebase Hosting, etc.
 
-Send the URL to the other parent. On first open, each of you picks who you
-are (names are editable in Settings ⚙️, along with your son's name); every
-entry from that device is then labeled with that name.
+Send the URL to the other parent. On first open, each of you creates an
+account (email + password) and claims your side of the record — permanently.
+Names are editable in Settings ⚙️, along with your son's name; every entry
+is labeled with the name of the account that made it.
 
-## Step 5 — Add to home screen
+## Step 6 — Add to home screen
 
 On a phone, use "Add to Home Screen" in the browser menu so it opens like
 an app — straight to the log-poo button.

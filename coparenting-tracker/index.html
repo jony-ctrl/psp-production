@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
   // ── Firebase config ─────────────────────────────────────────────
@@ -304,7 +305,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
 /* ═══ Form fields ═══ */
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: .75rem; font-weight: 500; color: var(--on-surface-variant); margin-bottom: 6px; }
-.field input[type=text], .field input[type=datetime-local], .field textarea, .field select {
+.field input[type=text], .field input[type=email], .field input[type=password], .field input[type=datetime-local], .field textarea, .field select {
   width: 100%; padding: 14px 16px; border-radius: 12px;
   border: 1px solid var(--outline); background: var(--surface-container-lowest);
   outline: none;
@@ -468,7 +469,44 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
   <button class="nav-item" data-view="history"><span class="ind"><svg class="mi"><use href="#i-history"/></svg></span>History</button>
 </nav>
 
-<!-- ═══ Identity dialog ═══ -->
+<!-- ═══ Sign-in dialog (live mode) ═══ -->
+<div class="scrim" id="dlg-auth" hidden>
+  <div class="dialog">
+    <h2 id="auth-title">Sign in</h2>
+    <p class="dlg-body">Care Log is private to you two. Each entry is permanently tied to the signed-in account that made it.</p>
+    <div class="field" style="margin-top:14px">
+      <label for="auth-email">Email</label>
+      <input type="email" id="auth-email" autocomplete="email" inputmode="email">
+    </div>
+    <div class="field">
+      <label for="auth-pw">Password</label>
+      <input type="password" id="auth-pw" autocomplete="current-password">
+    </div>
+    <div id="auth-err" style="color:var(--error);font-size:.8125rem;min-height:1.2em;margin-bottom:8px"></div>
+    <button class="btn filled" id="auth-submit" style="width:100%;height:48px">Sign in</button>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;flex-wrap:wrap;gap:4px">
+      <button class="btn text" id="auth-toggle">Create account</button>
+      <button class="btn text" id="auth-reset">Forgot password?</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Role claim dialog (live mode, once per account) ═══ -->
+<div class="scrim" id="dlg-claim" hidden>
+  <div class="dialog">
+    <h2>Which parent are you?</h2>
+    <p class="dlg-body">This permanently links your account to your side of the record. Each side can only ever be claimed by one account.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+      <button class="btn tonal" id="claim-a" style="height:52px;font-size:1rem"></button>
+      <button class="btn tonal" id="claim-b" style="height:52px;font-size:1rem"></button>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn text" id="claim-signout">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Identity dialog (demo/preview mode only) ═══ -->
 <div class="scrim" id="dlg-identity" hidden>
   <div class="dialog">
     <h2>Who's using this device?</h2>
@@ -659,19 +697,67 @@ function makeLocalStore() {
 
 function makeFirebaseStore() {
   firebase.initializeApp(window.firebaseConfig);
-  const root = firebase.database().ref("coparenting");
+  const auth = firebase.auth();
+  const db = firebase.database();
+  const root = db.ref("coparenting");
+  const listeners = [];
+  let attached = false;
   function fbErr(e) {
+    if (!auth.currentUser) { attached = false; return; }
     showSnack(/permission/i.test(String(e && e.message))
-      ? "Database rules not published yet — paste the rules from SETUP.md Step 3"
+      ? "The database refused that — check the rules in SETUP.md are published"
       : "Couldn't reach the database — check your connection");
+  }
+  // Data only syncs once this account is signed in AND has claimed a role
+  // (the database rules refuse everything else).
+  function attach() {
+    if (attached) return;
+    attached = true;
+    root.on("value", s => { const v = s.val() || {}; listeners.forEach(fn => fn(v)); },
+      e => { attached = false; fbErr(e); });
   }
   return {
     mode: "live",
     now() { return Date.now(); },
     serverTs() { return firebase.database.ServerValue.TIMESTAMP; },
-    onRoot(cb) { root.on("value", s => cb(s.val() || {}), fbErr); },
+    onRoot(cb) { listeners.push(cb); },
     push(path, val) { const ref = root.child(path).push(); ref.set(val).catch(fbErr); return ref.key; },
-    set(path, val) { root.child(path).set(val).catch(fbErr); }
+    set(path, val) { root.child(path).set(val).catch(fbErr); },
+    authApi: {
+      onState(cb) {
+        let rolesRef = null, memberRef = null;
+        auth.onAuthStateChanged(u => {
+          if (rolesRef) { rolesRef.off(); rolesRef = null; }
+          if (memberRef) { memberRef.off(); memberRef = null; }
+          const st = { user: u, roles: {}, member: null };
+          if (u) {
+            rolesRef = db.ref("coparenting/roles");
+            rolesRef.on("value", s => { st.roles = s.val() || {}; cb(st); }, () => {});
+            memberRef = db.ref("coparenting/members/" + u.uid);
+            memberRef.on("value", s => {
+              st.member = s.val() || null;
+              if (st.member) attach();
+              cb(st);
+            }, () => {});
+          }
+          cb(st);
+        });
+      },
+      signIn(email, pw) { return auth.signInWithEmailAndPassword(email, pw); },
+      signUp(email, pw) { return auth.createUserWithEmailAndPassword(email, pw); },
+      reset(email) { return auth.sendPasswordResetEmail(email); },
+      signOut() { return auth.signOut(); },
+      email() { return (auth.currentUser && auth.currentUser.email) || null; },
+      claimRole(role) {
+        const u = auth.currentUser;
+        if (!u) return Promise.reject(new Error("not signed in"));
+        const roleRef = db.ref("coparenting/roles/" + role);
+        return roleRef.set(u.uid)
+          .catch(err => roleRef.once("value").then(s => { if (s.val() !== u.uid) throw err; }))
+          .then(() => db.ref("coparenting/members/" + u.uid)
+            .set({ role, email: u.email || null, at: Date.now() }));
+      }
+    }
   };
 }
 
@@ -755,8 +841,98 @@ function showSnack(text, actionLabel, actionFn) {
   showSnack._t = setTimeout(() => { bar.hidden = true; }, 4000);
 }
 
-/* ── Identity ── */
+/* ── Auth (live mode): sign in, then claim your side once ── */
+let authState = null;
+let authMode = "signin";
+function setupAuth() {
+  if (!store.authApi) { ensureIdentity(); return; }
+  store.authApi.onState(st => {
+    authState = st;
+    if (!st.user) {
+      identity = null;
+      data = {};
+      $("dlg-claim").hidden = true;
+      $("dlg-auth").hidden = false;
+    } else if (!st.member) {
+      identity = null;
+      $("dlg-auth").hidden = true;
+      renderClaim(st);
+      $("dlg-claim").hidden = false;
+    } else {
+      identity = st.member.role;
+      $("dlg-auth").hidden = true;
+      $("dlg-claim").hidden = true;
+    }
+    renderAll();
+  });
+}
+function authError(e) {
+  const code = (e && e.code) || "";
+  $("auth-err").textContent = {
+    "auth/invalid-email": "That email doesn't look right",
+    "auth/user-not-found": "No account with that email — tap Create account",
+    "auth/wrong-password": "Wrong password",
+    "auth/invalid-credential": "Wrong email or password",
+    "auth/email-already-in-use": "That email already has an account — sign in instead",
+    "auth/weak-password": "Password needs at least 6 characters",
+    "auth/too-many-requests": "Too many tries — wait a bit or reset your password",
+    "auth/network-request-failed": "No connection — try again",
+    "auth/operation-not-allowed": "Email sign-in isn't enabled yet (Firebase console → Authentication → Sign-in method)"
+  }[code] || (e && e.message) || "Something went wrong";
+}
+$("auth-toggle").onclick = () => {
+  authMode = authMode === "signin" ? "signup" : "signin";
+  $("auth-title").textContent = authMode === "signin" ? "Sign in" : "Create account";
+  $("auth-submit").textContent = authMode === "signin" ? "Sign in" : "Create account";
+  $("auth-toggle").textContent = authMode === "signin" ? "Create account" : "I have an account";
+  $("auth-pw").autocomplete = authMode === "signin" ? "current-password" : "new-password";
+  $("auth-err").textContent = "";
+};
+$("auth-submit").onclick = () => {
+  const email = $("auth-email").value.trim(), pw = $("auth-pw").value;
+  if (!email || !pw) { $("auth-err").textContent = "Enter your email and a password"; return; }
+  $("auth-err").textContent = "";
+  (authMode === "signin" ? store.authApi.signIn(email, pw) : store.authApi.signUp(email, pw))
+    .catch(authError);
+};
+$("auth-pw").addEventListener("keydown", e => { if (e.key === "Enter") $("auth-submit").click(); });
+$("auth-reset").onclick = () => {
+  const email = $("auth-email").value.trim();
+  if (!email) { $("auth-err").textContent = "Type your email above first, then tap reset"; return; }
+  store.authApi.reset(email)
+    .then(() => showSnack("Password reset email sent to " + email))
+    .catch(authError);
+};
+$("claim-signout").onclick = () => store.authApi.signOut();
+function renderClaim(st) {
+  const n = names();
+  [["A", "claim-a"], ["B", "claim-b"]].forEach(([role, id]) => {
+    const btn = $(id);
+    const takenBy = st.roles[role];
+    const mine = takenBy && st.user && takenBy === st.user.uid;
+    btn.textContent = "I'm " + n[role] + (takenBy && !mine ? " (already claimed)" : "");
+    btn.disabled = !!takenBy && !mine;
+    btn.onclick = () => {
+      btn.disabled = true;
+      store.authApi.claimRole(role)
+        .then(() => {
+          store.push("events", {
+            type: "identity",
+            summary: n[role] + "'s side of the record was claimed by " + (st.user.email || "an account"),
+            by: role, at: store.now(), recordedAt: store.serverTs()
+          });
+        })
+        .catch(e => {
+          showSnack("Couldn't claim that side — " + ((e && e.message) || "try again"));
+          btn.disabled = false;
+        });
+    };
+  });
+}
+
+/* ── Identity (demo/preview mode) ── */
 function ensureIdentity() {
+  if (store.authApi) return !!identity; // live mode: the auth flow owns identity
   if (identity) { $("dlg-identity").hidden = true; return true; }
   const n = names();
   $("pick-a").textContent = n.A;
@@ -913,11 +1089,13 @@ $("btn-settings").onclick = () => {
   const n = names();
   $("set-child").value = childName();
   $("set-a").value = n.A; $("set-b").value = n.B;
+  const email = store.authApi && store.authApi.email();
   $("settings-identity-line").textContent = identity
-    ? "This device is signed in as " + nameOf(identity) + "."
+    ? "Signed in as " + nameOf(identity) + (email ? " (" + email + ")" : "") + "."
     : "No user selected on this device yet.";
+  $("btn-switch-identity").textContent = store.authApi ? "Sign out" : "Switch user";
   $("settings-mode-line").textContent = store.mode === "live"
-    ? "Live mode: data is shared between both parents via Firebase and poo/history entries are append-only."
+    ? "Live mode: data is shared between both parents via Firebase. Entries are append-only, and each one is tied to the signed-in account that made it."
     : "Demo mode: data is stored on this device only. Add your Firebase config (see SETUP.md) to share between both parents.";
   $("dlg-settings").hidden = false;
 };
@@ -934,6 +1112,7 @@ $("settings-save").onclick = () => {
 };
 $("btn-switch-identity").onclick = () => {
   $("dlg-settings").hidden = true;
+  if (store.authApi) { store.authApi.signOut(); return; }
   identity = null;
   try { localStorage.removeItem("carelog-identity"); } catch (e) {}
   ensureIdentity();
@@ -1171,7 +1350,7 @@ function renderHistory() {
 /* ── Boot ── */
 store.onRoot(snap => { data = snap || {}; renderAll(); });
 setInterval(() => { if (currentView === "home") renderHome(); }, 30000);
-ensureIdentity();
+setupAuth();
 renderAll();
 </script>
 </body>
