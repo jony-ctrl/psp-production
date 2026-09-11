@@ -414,6 +414,8 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
     </div>
   </div>
 
+  <div class="card" id="away-card" hidden></div>
+
   <div class="card" id="today-card">
     <h2>Today</h2>
     <div id="today-content" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div>
@@ -957,6 +959,55 @@ function renderClaim(st) {
   });
 }
 
+/* ── In-app activity notifications ──
+   "While you were away": other-parent activity since this device's last
+   visit, shown as a card on Home. Live: a snackbar + vibration when the
+   other parent's action syncs in while the app is open. */
+let seenUpTo = 0;
+try { seenUpTo = Number(localStorage.getItem("carelog-seen") || 0) || 0; } catch (e) {}
+let actBootDone = false, knownEventIds = null, awayItems = [];
+function markSeen() {
+  seenUpTo = Date.now();
+  try { localStorage.setItem("carelog-seen", String(seenUpTo)); } catch (e) {}
+}
+function renderAwayCard() {
+  const card = $("away-card");
+  if (!awayItems.length) { card.hidden = true; return; }
+  const shown = awayItems.slice(0, 8);
+  card.innerHTML = "<h2>While you were away</h2>" +
+    shown.map(renderEventItem).join("") +
+    (awayItems.length > shown.length
+      ? '<div style="font-size:.8125rem;color:var(--on-surface-variant);padding:8px 4px 0">…and ' + (awayItems.length - shown.length) + " more in History</div>" : "") +
+    '<div class="dlg-actions" style="margin-top:8px"><button class="btn tonal" id="away-dismiss">Got it</button></div>';
+  $("away-dismiss").onclick = () => { awayItems = []; markSeen(); card.hidden = true; };
+  card.hidden = false;
+}
+function processActivity() {
+  if (!identity) return;
+  const evs = eventList();
+  if (!actBootDone) {
+    actBootDone = true;
+    knownEventIds = new Set(evs.map(e => e.id));
+    const weekAgo = Date.now() - 7 * 864e5;
+    awayItems = evs.filter(e => e.by && e.by !== identity && e.at > seenUpTo && e.at > weekAgo);
+    renderAwayCard();
+    if (!awayItems.length) markSeen();
+    return;
+  }
+  const fresh = evs.filter(e => !knownEventIds.has(e.id));
+  fresh.forEach(e => knownEventIds.add(e.id));
+  const others = fresh.filter(e => e.by && e.by !== identity);
+  if (!others.length) return;
+  if (document.hidden) {
+    awayItems = others.concat(awayItems);
+    renderAwayCard();
+  } else {
+    showSnack(others[0].summary + (others.length > 1 ? " (+" + (others.length - 1) + " more)" : ""));
+    if (navigator.vibrate) { try { navigator.vibrate(80); } catch (e) {} }
+    markSeen();
+  }
+}
+
 /* ── Identity (demo/preview mode) ── */
 function ensureIdentity() {
   if (store.authApi) return !!identity; // live mode: the auth flow owns identity
@@ -971,6 +1022,7 @@ function setIdentity(who, isSwitch) {
   identity = who;
   try { localStorage.setItem("carelog-identity", who); } catch (e) {}
   $("dlg-identity").hidden = true;
+  processActivity();
   if (isSwitch) logEvent("identity", nameOf(who) + " signed in on a device");
   renderAll();
 }
@@ -1377,7 +1429,7 @@ function renderHistory() {
 }
 
 /* ── Boot ── */
-store.onRoot(snap => { data = snap || {}; renderAll(); });
+store.onRoot(snap => { data = snap || {}; processActivity(); renderAll(); });
 setInterval(() => { if (currentView === "home") renderHome(); }, 30000);
 setupAuth();
 renderAll();
