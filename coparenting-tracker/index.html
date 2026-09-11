@@ -10,17 +10,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
   // ── Firebase config ─────────────────────────────────────────────
-  // Replace with your own project's values (see SETUP.md).
-  // While these placeholders remain, the app runs in LOCAL DEMO mode
-  // (data stays on this device only).
   window.firebaseConfig = {
-    apiKey:            "REPLACE_API_KEY",
-    authDomain:        "REPLACE_AUTH_DOMAIN",
-    databaseURL:       "REPLACE_DATABASE_URL",
-    projectId:         "REPLACE_PROJECT_ID",
-    storageBucket:     "REPLACE_STORAGE_BUCKET",
-    messagingSenderId: "REPLACE_MESSAGING_SENDER_ID",
-    appId:             "REPLACE_APP_ID"
+    apiKey:            "AIzaSyCZ8wCIgUwmJdrX-ZQoyjUxNU-R0nY7U9g",
+    authDomain:        "coparenting-tracker-96fc2.firebaseapp.com",
+    databaseURL:       "https://coparenting-tracker-96fc2-default-rtdb.firebaseio.com",
+    projectId:         "coparenting-tracker-96fc2",
+    storageBucket:     "coparenting-tracker-96fc2.firebasestorage.app",
+    messagingSenderId: "293118350436",
+    appId:             "1:293118350436:web:5a693d90575d76adafbb71"
   };
 </script>
 
@@ -626,13 +623,18 @@ function makeLocalStore() {
 function makeFirebaseStore() {
   firebase.initializeApp(window.firebaseConfig);
   const root = firebase.database().ref("coparenting");
+  function fbErr(e) {
+    showSnack(/permission/i.test(String(e && e.message))
+      ? "Database rules not published yet — paste the rules from SETUP.md Step 3"
+      : "Couldn't reach the database — check your connection");
+  }
   return {
     mode: "live",
     now() { return Date.now(); },
     serverTs() { return firebase.database.ServerValue.TIMESTAMP; },
-    onRoot(cb) { root.on("value", s => cb(s.val() || {})); },
-    push(path, val) { return root.child(path).push(val).key; },
-    set(path, val) { root.child(path).set(val); }
+    onRoot(cb) { root.on("value", s => cb(s.val() || {}), fbErr); },
+    push(path, val) { const ref = root.child(path).push(); ref.set(val).catch(fbErr); return ref.key; },
+    set(path, val) { root.child(path).set(val).catch(fbErr); }
   };
 }
 
