@@ -342,8 +342,29 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
 .empty { text-align: center; color: var(--on-surface-variant); font-size: .875rem; padding: 32px 16px; }
 .empty .em { font-size: 2.2rem; display: block; margin-bottom: 8px; }
 .section-label { font-size: .8125rem; font-weight: 500; color: var(--on-surface-variant); margin: 18px 4px 8px; }
-.thread-msg { border-radius: 14px; background: var(--surface-container-high); padding: 10px 14px; margin-bottom: 8px; font-size: .9rem; }
-.thread-msg .meta { font-size: .72rem; color: var(--on-surface-variant); margin-bottom: 3px; }
+.adrian-avatar {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  background: var(--tertiary-container); color: var(--on-tertiary-container);
+  display: flex; align-items: center; justify-content: center;
+}
+.adrian-avatar .mi { width: 26px; height: 26px; }
+.chat { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.bubble { max-width: 85%; border-radius: 16px; padding: 10px 14px; font-size: .9rem; }
+.bubble .meta { font-size: .72rem; color: var(--on-surface-variant); margin-bottom: 3px; }
+.bubble.me { align-self: flex-end; background: var(--primary-container); color: var(--on-primary-container); border-bottom-right-radius: 4px; }
+.bubble.me .meta { color: inherit; opacity: .75; }
+.bubble.them { align-self: flex-start; background: var(--surface-container-high); border-bottom-left-radius: 4px; }
+.bubble.adrian { align-self: stretch; max-width: 100%; background: var(--tertiary-container); color: var(--on-tertiary-container); display: flex; gap: 10px; align-items: flex-start; }
+.bubble.adrian .meta { color: inherit; opacity: .75; }
+.bubble.adrian .quote {
+  margin-top: 6px; padding: 8px 12px; border-radius: 8px; font-weight: 500;
+  border-left: 3px solid var(--tertiary);
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+}
+.bubble.adrian.sys { background: transparent; border: 1px dashed var(--outline-variant); color: var(--on-surface-variant); align-self: stretch; }
+.tpl-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.tpl { text-align: left; border: 1px solid var(--outline-variant); border-radius: 12px; padding: 12px 14px; font-size: .9rem; transition: background .12s; }
+.tpl.sel { background: var(--secondary-container); color: var(--on-secondary-container); border-color: transparent; font-weight: 500; }
 .fairness-note { font-size: .75rem; color: var(--on-surface-variant); text-align: center; padding: 8px 24px 0; line-height: 1.5; }
 </style>
 </head>
@@ -357,6 +378,7 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/></symbol>
   <symbol id="i-forum" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></symbol>
+  <symbol id="i-robot" viewBox="0 0 24 24"><path d="M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zm-2 10H6V7h12v12zm-9-6c-.83 0-1.5-.67-1.5-1.5S8.17 10 9 10s1.5.67 1.5 1.5S9.83 13 9 13zm7.5-1.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5 1.5.67 1.5 1.5zM8 15h8v2H8v-2z"/></symbol>
   <symbol id="i-history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.96 6.96 0 0 1-4.94-2.06l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
   <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></symbol>
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"/></symbol>
@@ -416,8 +438,18 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
   <p class="fairness-note">Tap a day to see poo entries and set custody.</p>
 </main>
 
-<!-- ═══ Requests ═══ -->
+<!-- ═══ Requests (Adrian) ═══ -->
 <main class="view" id="view-requests" hidden>
+  <div class="card" style="display:flex;gap:14px;align-items:flex-start">
+    <div class="adrian-avatar"><svg class="mi"><use href="#i-robot"/></svg></div>
+    <div>
+      <div style="font-weight:500;font-family:'Google Sans','Roboto',sans-serif;font-size:1rem">Adrian</div>
+      <div style="font-size:.8125rem;color:var(--on-surface-variant);margin-top:2px" id="adrian-intro">
+        I'm the messenger. Pick a request, and I'll pass it along so neither of you has to
+        start the conversation. I'm automated — and every request shows which parent it's from.
+      </div>
+    </div>
+  </div>
   <div id="req-list"></div>
 </main>
 
@@ -426,13 +458,13 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
   <div id="history-list"></div>
 </main>
 
-<button class="fab" id="fab-new-req" hidden><svg class="mi"><use href="#i-add"/></svg> New request</button>
+<button class="fab" id="fab-new-req" hidden><svg class="mi"><use href="#i-robot"/></svg> Ask Adrian</button>
 
 <!-- ═══ Bottom nav ═══ -->
 <nav class="nav-bar">
   <button class="nav-item active" data-view="home"><span class="ind"><svg class="mi"><use href="#i-home"/></svg></span>Home</button>
   <button class="nav-item" data-view="calendar"><span class="ind"><svg class="mi"><use href="#i-calendar"/></svg></span>Calendar</button>
-  <button class="nav-item" data-view="requests"><span class="ind"><svg class="mi"><use href="#i-forum"/></svg></span>Requests</button>
+  <button class="nav-item" data-view="requests"><span class="ind"><svg class="mi"><use href="#i-robot"/></svg></span>Adrian</button>
   <button class="nav-item" data-view="history"><span class="ind"><svg class="mi"><use href="#i-history"/></svg></span>History</button>
 </nav>
 
@@ -507,21 +539,26 @@ h1,h2,h3 { font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500; m
   </div>
 </div>
 
-<!-- ═══ New request dialog ═══ -->
+<!-- ═══ New request dialog (Ask Adrian) ═══ -->
 <div class="scrim" id="dlg-new-req" hidden>
   <div class="dialog">
-    <h2>New request</h2>
-    <div class="field">
-      <label for="req-title">What do you need?</label>
+    <h2 style="display:flex;align-items:center;gap:10px">
+      <span class="adrian-avatar" style="width:36px;height:36px"><svg class="mi" style="width:20px;height:20px"><use href="#i-robot"/></svg></span>
+      Ask Adrian
+    </h2>
+    <p class="dlg-body" id="adrian-ask-line" style="margin-bottom:12px"></p>
+    <div class="tpl-list" id="tpl-list"></div>
+    <div class="field" id="req-custom-field" hidden>
+      <label for="req-title">Your request</label>
       <input type="text" id="req-title" placeholder="e.g. Swap Saturday, pack extra clothes…">
     </div>
     <div class="field">
-      <label for="req-note">Details (optional)</label>
+      <label for="req-note">Anything Adrian should add? (dates, details — optional)</label>
       <textarea id="req-note"></textarea>
     </div>
     <div class="dlg-actions">
       <button class="btn text" data-close="dlg-new-req">Cancel</button>
-      <button class="btn filled" id="req-save">Send</button>
+      <button class="btn filled" id="req-save">Send via Adrian</button>
     </div>
   </div>
 </div>
@@ -798,22 +835,52 @@ $("day-custody-seg").addEventListener("click", ev => {
   }
 });
 
-/* ── Requests ── */
+/* ── Requests (via Adrian, the in-app messenger bot) ── */
+const REQUEST_TEMPLATES = [
+  "Can we make a change to the schedule?",
+  "I'd like to have him next weekend",
+  "Can we swap days this week?",
+  "I'm running late for pickup / drop-off",
+  "Please pack extra clothes / supplies",
+  "Can we coordinate a doctor's visit?",
+  "Something else…"
+];
+let tplSelected = -1;
+function otherParentName() { return identity === "A" ? nameOf("B") : nameOf("A"); }
+function renderTplList() {
+  $("tpl-list").innerHTML = REQUEST_TEMPLATES.map((t, i) =>
+    '<button class="tpl' + (i === tplSelected ? " sel" : "") + '" data-tpl="' + i + '">' + esc(t) + "</button>").join("");
+  $("tpl-list").querySelectorAll("[data-tpl]").forEach(b => {
+    b.onclick = () => {
+      tplSelected = Number(b.dataset.tpl);
+      $("req-custom-field").hidden = tplSelected !== REQUEST_TEMPLATES.length - 1;
+      renderTplList();
+      if (!$("req-custom-field").hidden) $("req-title").focus();
+    };
+  });
+}
 $("fab-new-req").onclick = () => {
   if (!ensureIdentity()) return;
+  tplSelected = -1;
   $("req-title").value = ""; $("req-note").value = "";
+  $("req-custom-field").hidden = true;
+  $("adrian-ask-line").textContent = "Pick a request and I'll pass it along to " + otherParentName() + " — labeled as from you.";
+  renderTplList();
   $("dlg-new-req").hidden = false;
 };
 $("req-save").onclick = () => {
-  const title = $("req-title").value.trim();
-  if (!title) { showSnack("Give the request a short title"); return; }
+  if (tplSelected < 0) { showSnack("Pick a request for Adrian to send"); return; }
+  const custom = tplSelected === REQUEST_TEMPLATES.length - 1;
+  const title = custom ? $("req-title").value.trim() : REQUEST_TEMPLATES[tplSelected];
+  if (!title) { showSnack("Tell Adrian what to ask"); return; }
   const note = $("req-note").value.trim();
   const id = store.push("requests", {
     title, note: note || null, by: identity, at: store.now(),
     recordedAt: store.serverTs(), status: "open"
   });
-  logEvent("request", nameOf(identity) + " opened a request: “" + title + "”");
+  logEvent("request", "Adrian delivered a request from " + nameOf(identity) + ": “" + title + "”");
   $("dlg-new-req").hidden = true;
+  showSnack("Adrian is on it 🤖 — delivered to " + otherParentName());
   openRequest(id);
 };
 function openRequest(id) {
@@ -956,7 +1023,7 @@ function renderHome() {
     : '<div class="empty" style="padding:12px">Nothing yet — activity from both parents shows up here.</div>';
 }
 
-const EVENT_ICONS = { poop: "💩", custody: "🏠", request: "💬", void: "🚩", settings: "⚙️", identity: "👤" };
+const EVENT_ICONS = { poop: "💩", custody: "🏠", request: "🤖", void: "🚩", settings: "⚙️", identity: "👤" };
 function renderEventItem(e) {
   return '<div class="list-item">' +
     '<div class="li-icon">' + (EVENT_ICONS[e.type] || "📌") + "</div>" +
@@ -1047,11 +1114,11 @@ function renderRequests() {
           '<div style="font-size:1rem;font-weight:500;font-family:\'Google Sans\',Roboto,sans-serif">' + esc(r.title) + "</div>" +
           '<span class="chip ' + s[1] + '" style="height:26px">' + s[0] + "</span></div>" +
           '<div style="font-size:.8125rem;color:var(--on-surface-variant);margin-top:6px">' +
-          esc(nameOf(r.by)) + " · " + fmtDateTime(r.at) +
+          "From " + esc(nameOf(r.by)) + ", via Adrian · " + fmtDateTime(r.at) +
           (lastMsg ? "<br>Last reply (" + esc(nameOf(lastMsg.by)) + "): " + esc(lastMsg.text.slice(0, 80)) : "") +
           "</div></button>";
       }).join("")
-    : '<div class="empty"><span class="em">💬</span>No requests yet.<br>Use “New request” for swaps, supplies, pickups — anything either of you needs.</div>';
+    : '<div class="empty"><span class="em">🤖</span>No requests yet.<br>Tap “Ask Adrian” for schedule changes, swaps, supplies — anything either of you needs.</div>';
   $("req-list").querySelectorAll("[data-req]").forEach(b => { b.onclick = () => openRequest(b.dataset.req); });
 }
 
@@ -1059,20 +1126,28 @@ function renderRequestDetail() {
   const r = (data.requests || {})[openReqId];
   if (!r) { $("dlg-req").hidden = true; return; }
   $("req-d-title").textContent = r.title;
-  $("req-d-sub").textContent = "Opened by " + nameOf(r.by) + " · " + fmtDateTime(r.at);
-  let html = "";
-  if (r.note) html += '<div class="thread-msg"><div class="meta">' + esc(nameOf(r.by)) + " · " + fmtDateTime(r.at) + "</div>" + esc(r.note) + "</div>";
+  $("req-d-sub").textContent = "From " + nameOf(r.by) + ", delivered by Adrian · " + fmtDateTime(r.at);
+  const avatar = '<span class="adrian-avatar" style="width:32px;height:32px"><svg class="mi" style="width:18px;height:18px"><use href="#i-robot"/></svg></span>';
+  let html = '<div class="chat">';
+  html += '<div class="bubble adrian">' + avatar + '<div style="min-width:0">' +
+    '<div class="meta">Adrian · ' + fmtDateTime(r.at) + "</div>" +
+    "Hi! " + esc(nameOf(r.by)) + " asked me to pass this along:" +
+    '<div class="quote">' + esc(r.title) + (r.note ? '<div style="font-weight:400;margin-top:4px">' + esc(r.note) + "</div>" : "") + "</div>" +
+    "</div></div>";
   const updates = Object.values(r.updates || {}).sort((a, b) => a.at - b.at);
   updates.forEach(u => {
     if (u.kind === "msg") {
-      html += '<div class="thread-msg"><div class="meta">' + esc(nameOf(u.by)) + " · " + fmtDateTime(u.at) + "</div>" + esc(u.text) + "</div>";
+      const mine = u.by === identity;
+      html += '<div class="bubble ' + (mine ? "me" : "them") + '"><div class="meta">' +
+        esc(nameOf(u.by)) + " · " + fmtDateTime(u.at) + "</div>" + esc(u.text) + "</div>";
     } else if (u.kind === "status") {
-      const label = { open: "reopened", ack: "acknowledged", done: "marked done" }[u.status] || u.status;
-      html += '<div class="thread-msg" style="background:transparent;border:1px dashed var(--outline-variant)"><div class="meta">' +
-        esc(nameOf(u.by)) + " " + label + " · " + fmtDateTime(u.at) + "</div></div>";
+      const label = { open: "reopened this request", ack: "acknowledged this request", done: "marked this request done" }[u.status] || u.status;
+      html += '<div class="bubble adrian sys"><div class="meta">Adrian · ' + fmtDateTime(u.at) + "</div>" +
+        esc(nameOf(u.by)) + " " + label + ".</div>";
     }
   });
-  $("req-d-thread").innerHTML = html || '<div class="empty" style="padding:10px">No replies yet.</div>';
+  html += "</div>";
+  $("req-d-thread").innerHTML = html;
   $("req-ack").hidden = r.status !== "open";
   $("req-done").hidden = r.status === "done";
   $("req-reopen").hidden = r.status !== "done";
