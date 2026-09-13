@@ -494,6 +494,7 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
   <div class="dialog">
     <h2 id="auth-title">Sign in</h2>
     <p class="dlg-body">Care Log is private to you two. Each entry is permanently tied to the signed-in account that made it.</p>
+    <p class="dlg-body" id="auth-firsttime" style="background:var(--secondary-container);color:var(--on-secondary-container);border-radius:10px;padding:10px 12px;margin-top:10px">👋 <b>First time here?</b> Tap <b>Create account</b> below first — signing in only works once your account exists.</p>
     <div class="field" style="margin-top:14px">
       <label for="auth-email">Email</label>
       <input type="email" id="auth-email" autocomplete="email" inputmode="email">
@@ -915,6 +916,7 @@ $("auth-toggle").onclick = () => {
   $("auth-submit").textContent = authMode === "signin" ? "Sign in" : "Create account";
   $("auth-toggle").textContent = authMode === "signin" ? "Create account" : "I have an account";
   $("auth-pw").autocomplete = authMode === "signin" ? "current-password" : "new-password";
+  $("auth-firsttime").hidden = authMode !== "signin";
   $("auth-err").textContent = "";
 };
 $("auth-submit").onclick = () => {
@@ -928,8 +930,10 @@ $("auth-pw").addEventListener("keydown", e => { if (e.key === "Enter") $("auth-s
 $("auth-reset").onclick = () => {
   const email = $("auth-email").value.trim();
   if (!email) { $("auth-err").textContent = "Type your email above first, then tap reset"; return; }
+  // Firebase deliberately doesn't reveal whether an email has an account:
+  // a reset for an unknown address "succeeds" without sending anything.
   store.authApi.reset(email)
-    .then(() => showSnack("Password reset email sent to " + email))
+    .then(() => showSnack("If an account exists for " + email + ", a reset email is on its way — check spam too. No email = no account with that exact address."))
     .catch(authError);
 };
 $("claim-signout").onclick = () => store.authApi.signOut();
