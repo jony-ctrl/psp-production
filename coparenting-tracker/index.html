@@ -631,7 +631,7 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
     <div class="sheet-sub" id="req-d-sub"></div>
     <div id="req-d-thread"></div>
     <div class="field" style="margin-top:12px">
-      <label for="req-reply">Reply</label>
+      <label for="req-reply">Reply — Adrian will pass it along</label>
       <textarea id="req-reply" style="min-height:56px"></textarea>
     </div>
     <div class="conduct-note"><span class="r-em">🕊️</span><span>Adrian's reminder: civil, about <span class="child-ref">your son</span>, and permanent. Upset? Wait an hour before you send.</span></div>
@@ -1401,9 +1401,11 @@ function renderRequestDetail() {
   const updates = Object.values(r.updates || {}).sort((a, b) => a.at - b.at);
   updates.forEach(u => {
     if (u.kind === "msg") {
-      const mine = u.by === identity;
-      html += '<div class="bubble ' + (mine ? "me" : "them") + '"><div class="meta">' +
-        esc(nameOf(u.by)) + " · " + fmtDateTime(u.at) + "</div>" + esc(u.text) + "</div>";
+      html += '<div class="bubble adrian">' + avatar + '<div style="min-width:0">' +
+        '<div class="meta">Adrian · ' + fmtDateTime(u.at) + "</div>" +
+        esc(nameOf(u.by)) + " replies:" +
+        '<div class="quote" style="font-weight:400">' + esc(u.text) + "</div>" +
+        "</div></div>";
     } else if (u.kind === "status") {
       const label = { open: "reopened this request", ack: "acknowledged this request", done: "marked this request done" }[u.status] || u.status;
       html += '<div class="bubble adrian sys"><div class="meta">Adrian · ' + fmtDateTime(u.at) + "</div>" +
