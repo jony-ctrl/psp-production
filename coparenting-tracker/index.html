@@ -364,6 +364,8 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
   border-left: 3px solid var(--tertiary);
   background: color-mix(in srgb, var(--surface) 45%, transparent);
 }
+.bubble.adrian.by-a { background: var(--primary-container); color: var(--on-primary-container); }
+.bubble.adrian.by-a .quote { border-left-color: var(--primary); }
 .bubble.adrian.sys { background: transparent; border: 1px dashed var(--outline-variant); color: var(--on-surface-variant); align-self: stretch; }
 .tpl-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .tpl { text-align: left; border: 1px solid var(--outline-variant); border-radius: 12px; padding: 12px 14px; font-size: .9rem; transition: background .12s; }
@@ -1393,7 +1395,7 @@ function renderRequestDetail() {
   $("req-d-sub").textContent = "From " + nameOf(r.by) + ", delivered by Adrian · " + fmtDateTime(r.at);
   const avatar = '<span class="adrian-avatar" style="width:32px;height:32px"><svg class="mi" style="width:18px;height:18px"><use href="#i-robot"/></svg></span>';
   let html = '<div class="chat">';
-  html += '<div class="bubble adrian">' + avatar + '<div style="min-width:0">' +
+  html += '<div class="bubble adrian by-' + (r.by === "A" ? "a" : "b") + '">' + avatar + '<div style="min-width:0">' +
     '<div class="meta">Adrian · ' + fmtDateTime(r.at) + "</div>" +
     "Hi! " + esc(nameOf(r.by)) + " asked me to pass this along:" +
     '<div class="quote">' + esc(r.title) + (r.note ? '<div style="font-weight:400;margin-top:4px">' + esc(r.note) + "</div>" : "") + "</div>" +
@@ -1401,7 +1403,7 @@ function renderRequestDetail() {
   const updates = Object.values(r.updates || {}).sort((a, b) => a.at - b.at);
   updates.forEach(u => {
     if (u.kind === "msg") {
-      html += '<div class="bubble adrian">' + avatar + '<div style="min-width:0">' +
+      html += '<div class="bubble adrian by-' + (u.by === "A" ? "a" : "b") + '">' + avatar + '<div style="min-width:0">' +
         '<div class="meta">Adrian · ' + fmtDateTime(u.at) + "</div>" +
         esc(nameOf(u.by)) + " replies:" +
         '<div class="quote" style="font-weight:400">' + esc(u.text) + "</div>" +
