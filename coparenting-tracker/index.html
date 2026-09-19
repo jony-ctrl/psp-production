@@ -375,6 +375,18 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
 .rule b { color: var(--on-surface); font-weight: 500; }
 .conduct-note { display: flex; gap: 8px; align-items: flex-start; font-size: .75rem; color: var(--on-surface-variant); line-height: 1.45; margin: 2px 0 10px; }
 .conduct-note .r-em { flex-shrink: 0; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.photo-cell {
+  aspect-ratio: 1; border-radius: 12px; overflow: hidden; position: relative;
+  background: var(--surface-container-high); padding: 0; width: 100%;
+}
+.photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-cell .ph-by {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  font-size: .65rem; padding: 3px 6px; text-align: left;
+  background: rgba(0,0,0,.5); color: #fff;
+}
+#photo-view-img { width: 100%; max-height: 60dvh; object-fit: contain; border-radius: 16px; background: var(--surface-container-lowest); }
 .fairness-note { font-size: .75rem; color: var(--on-surface-variant); text-align: center; padding: 8px 24px 0; line-height: 1.5; }
 </style>
 </head>
@@ -392,6 +404,7 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
   <symbol id="i-history" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.96 6.96 0 0 1-4.94-2.06l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
   <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></symbol>
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"/></symbol>
+  <symbol id="i-photos" viewBox="0 0 24 24"><path d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4 2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></symbol>
 </svg>
 
 <!-- ═══ Top app bar ═══ -->
@@ -476,6 +489,18 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
   <div id="req-list"></div>
 </main>
 
+<!-- ═══ Photos ═══ -->
+<main class="view" id="view-photos" hidden>
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <h2 style="margin:0">Photos</h2>
+    <button class="btn filled" id="btn-add-photo"><svg class="mi sm"><use href="#i-add"/></svg> Add photo</button>
+  </div>
+  <div class="photo-grid" id="photo-grid"></div>
+  <div class="empty" id="photos-empty"><span class="em">📷</span>No photos yet.<br>Share moments and useful pics — outfits packed, that rash for the doctor, artwork.</div>
+  <p class="fairness-note">Photos are visible to both parents, labeled with who added them, and can be flagged as removed but never deleted.</p>
+</main>
+<input type="file" id="photo-file" accept="image/*" hidden>
+
 <!-- ═══ History ═══ -->
 <main class="view" id="view-history" hidden>
   <div id="history-list"></div>
@@ -488,6 +513,7 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
   <button class="nav-item active" data-view="home"><span class="ind"><svg class="mi"><use href="#i-home"/></svg></span>Home</button>
   <button class="nav-item" data-view="calendar"><span class="ind"><svg class="mi"><use href="#i-calendar"/></svg></span>Calendar</button>
   <button class="nav-item" data-view="requests"><span class="ind"><svg class="mi"><use href="#i-robot"/></svg></span>Adrian</button>
+  <button class="nav-item" data-view="photos"><span class="ind"><svg class="mi"><use href="#i-photos"/></svg></span>Photos</button>
   <button class="nav-item" data-view="history"><span class="ind"><svg class="mi"><use href="#i-history"/></svg></span>History</button>
 </nav>
 
@@ -580,6 +606,36 @@ body.locked .view, body.locked .nav-bar, body.locked .fab, body.locked #btn-sett
 
     <div class="dlg-actions">
       <button class="btn text" data-close="dlg-day">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Add photo dialog ═══ -->
+<div class="scrim" id="dlg-add-photo" hidden>
+  <div class="dialog">
+    <h2>Add photo</h2>
+    <img id="photo-preview" alt="Preview" style="width:100%;max-height:40dvh;object-fit:contain;border-radius:12px;background:var(--surface-container-lowest)">
+    <div class="field" style="margin-top:12px">
+      <label for="photo-caption">Caption (optional)</label>
+      <input type="text" id="photo-caption" placeholder="e.g. Ready for school, rash on left arm…">
+    </div>
+    <div class="dlg-actions">
+      <button class="btn text" data-close="dlg-add-photo">Cancel</button>
+      <button class="btn filled" id="photo-save">Add photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Photo viewer sheet ═══ -->
+<div class="scrim sheet-host" id="dlg-photo" hidden>
+  <div class="sheet">
+    <div class="drag"></div>
+    <img id="photo-view-img" alt="Photo">
+    <h2 id="photo-view-caption" style="margin-top:10px"></h2>
+    <div class="sheet-sub" id="photo-view-meta"></div>
+    <div class="dlg-actions" style="justify-content:space-between">
+      <button class="btn error-tonal" id="photo-flag">Flag as removed</button>
+      <button class="btn text" data-close="dlg-photo">Close</button>
     </div>
   </div>
 </div>
@@ -705,18 +761,35 @@ function makeLocalStore() {
     if (val === null) delete o[last]; else o[last] = val;
     save();
   }
+  function getAt(path) {
+    let o = data;
+    for (const p of path.split("/").filter(Boolean)) { o = (o || {})[p]; }
+    return o;
+  }
+  const topListeners = [];
+  const origSave = save;
+  save = function () {
+    origSave();
+    topListeners.forEach(l => l.cb(JSON.parse(JSON.stringify(getAt(l.path) || {}))));
+  };
   let seq = 0;
+  function mkId() { return Date.now().toString(36) + "-" + (seq++).toString(36) + Math.random().toString(36).slice(2, 6); }
   return {
     mode: "demo",
     now() { return Date.now(); },
     serverTs() { return Date.now(); },
     onRoot(cb) { listeners.push(cb); cb(JSON.parse(JSON.stringify(data))); },
-    push(path, val) {
-      const id = Date.now().toString(36) + "-" + (seq++).toString(36) + Math.random().toString(36).slice(2, 6);
-      setAt(path + "/" + id, val);
-      return id;
+    push(path, val) { const id = mkId(); setAt(path + "/" + id, val); return id; },
+    set(path, val) { setAt(path, val); },
+    watchTop(path, cb) {
+      const l = { path, cb };
+      topListeners.push(l);
+      cb(JSON.parse(JSON.stringify(getAt(path) || {})));
+      return () => { const i = topListeners.indexOf(l); if (i >= 0) topListeners.splice(i, 1); };
     },
-    set(path, val) { setAt(path, val); }
+    getTop(path) { return Promise.resolve(JSON.parse(JSON.stringify(getAt(path) || null))); },
+    pushTop(path, val) { const id = mkId(); setAt(path + "/" + id, val); return id; },
+    setTop(path, val) { setAt(path, val); }
   };
 }
 
@@ -748,6 +821,12 @@ function makeFirebaseStore() {
     onRoot(cb) { listeners.push(cb); },
     push(path, val) { const ref = root.child(path).push(); ref.set(val).catch(fbErr); return ref.key; },
     set(path, val) { root.child(path).set(val).catch(fbErr); },
+    // Top-level trees outside /coparenting (photos live there so the main
+    // root subscription never downloads image data).
+    watchTop(path, cb) { const r = db.ref(path); r.on("value", s => cb(s.val() || {}), fbErr); return () => r.off(); },
+    getTop(path) { return db.ref(path).once("value").then(s => s.val()); },
+    pushTop(path, val) { const ref = db.ref(path).push(); ref.set(val).catch(fbErr); return ref.key; },
+    setTop(path, val) { db.ref(path).set(val).catch(fbErr); },
     authApi: {
       onState(cb) {
         let rolesRef = null, memberRef = null;
@@ -1169,6 +1248,95 @@ $("req-send-reply").onclick = () => {
   $("req-reply").value = "";
 };
 
+/* ── Photos ──
+   Metadata + small thumbnails sync into the grid; the full-size image is
+   stored separately and fetched only when a photo is opened. Photos are
+   create-once and attributed; flagging hides one from the grid but the
+   record (and a History entry) remains. */
+let photosMeta = {};
+let photosWatched = false;
+let pendingPhoto = null;
+let openPhotoId = null;
+function watchPhotos() {
+  if (photosWatched || !store.watchTop) return;
+  photosWatched = true;
+  store.watchTop("photos", v => { photosMeta = v || {}; renderPhotos(); });
+}
+function renderPhotos() {
+  if (currentView !== "photos") return;
+  const list = Object.entries(photosMeta).map(([id, p]) => ({ id, ...p }))
+    .filter(p => !p.removed).sort((a, b) => b.at - a.at);
+  $("photos-empty").hidden = list.length > 0;
+  $("photo-grid").innerHTML = list.map(p =>
+    '<button class="photo-cell" data-photo="' + p.id + '">' +
+    '<img src="' + esc(p.thumb) + '" alt="' + esc(p.caption || "photo") + '">' +
+    '<span class="ph-by">' + esc(nameOf(p.by)) + " · " + fmtDate(p.at) + "</span></button>").join("");
+  $("photo-grid").querySelectorAll("[data-photo]").forEach(b => { b.onclick = () => openPhoto(b.dataset.photo); });
+}
+function shrinkImage(img, maxDim, q, maxLen) {
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(img.width * scale));
+  c.height = Math.max(1, Math.round(img.height * scale));
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  let out = c.toDataURL("image/jpeg", q);
+  while (out.length > maxLen && q > 0.35) { q -= 0.1; out = c.toDataURL("image/jpeg", q); }
+  return out;
+}
+$("btn-add-photo").onclick = () => { if (ensureIdentity()) $("photo-file").click(); };
+$("photo-file").onchange = () => {
+  const f = $("photo-file").files[0];
+  $("photo-file").value = "";
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    pendingPhoto = {
+      full: shrinkImage(img, 1280, 0.75, 200000),
+      thumb: shrinkImage(img, 320, 0.6, 30000)
+    };
+    $("photo-preview").src = pendingPhoto.full;
+    $("photo-caption").value = "";
+    $("dlg-add-photo").hidden = false;
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); showSnack("Couldn't read that image — try a different one"); };
+  img.src = url;
+};
+$("photo-save").onclick = () => {
+  if (!pendingPhoto) { $("dlg-add-photo").hidden = true; return; }
+  const caption = $("photo-caption").value.trim();
+  const id = store.pushTop("photos", {
+    by: identity, at: store.now(), recordedAt: store.serverTs(),
+    caption: caption || null, thumb: pendingPhoto.thumb
+  });
+  if (id) store.setTop("photofull/" + id, { data: pendingPhoto.full });
+  logEvent("photo", nameOf(identity) + " added a photo" + (caption ? " — “" + caption + "”" : ""));
+  pendingPhoto = null;
+  $("dlg-add-photo").hidden = true;
+  showSnack("Photo added 📷");
+};
+function openPhoto(id) {
+  const p = photosMeta[id];
+  if (!p) return;
+  openPhotoId = id;
+  $("photo-view-img").src = p.thumb;
+  $("photo-view-caption").textContent = p.caption || "";
+  $("photo-view-meta").textContent = "Added by " + nameOf(p.by) + " · " + fmtDateTime(p.at);
+  $("dlg-photo").hidden = false;
+  store.getTop("photofull/" + id).then(v => {
+    if (v && v.data && openPhotoId === id && !$("dlg-photo").hidden) $("photo-view-img").src = v.data;
+  });
+}
+$("photo-flag").onclick = () => {
+  const p = photosMeta[openPhotoId];
+  if (!p || !ensureIdentity()) return;
+  store.setTop("photos/" + openPhotoId + "/removed", { by: identity, at: store.now(), reason: "flagged" });
+  logEvent("photo", nameOf(identity) + " flagged a photo added by " + nameOf(p.by) + (p.caption ? " (“" + p.caption + "”)" : ""));
+  $("dlg-photo").hidden = true;
+  showSnack("Photo hidden from the grid — noted in History");
+};
+
 /* ── Settings ── */
 $("btn-settings").onclick = () => {
   const n = names();
@@ -1210,8 +1378,9 @@ document.querySelectorAll(".nav-item").forEach(btn => {
 function switchView(v) {
   currentView = v;
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === v));
-  ["home", "calendar", "requests", "history"].forEach(name => { $("view-" + name).hidden = name !== v; });
+  ["home", "calendar", "requests", "photos", "history"].forEach(name => { $("view-" + name).hidden = name !== v; });
   $("fab-new-req").hidden = v !== "requests";
+  if (v === "photos") watchPhotos();
   renderAll();
 }
 
@@ -1233,6 +1402,7 @@ function renderAll() {
   renderHome();
   renderCalendar();
   renderRequests();
+  renderPhotos();
   renderHistory();
   if (openDayStr && !$("dlg-day").hidden) renderDaySheet();
   if (openReqId && !$("dlg-req").hidden) renderRequestDetail();
@@ -1289,7 +1459,7 @@ function renderHome() {
     : '<div class="empty" style="padding:12px">Nothing yet — activity from both parents shows up here.</div>';
 }
 
-const EVENT_ICONS = { poop: "💩", custody: "🏠", request: "🤖", void: "🚩", settings: "⚙️", identity: "👤" };
+const EVENT_ICONS = { poop: "💩", custody: "🏠", request: "🤖", void: "🚩", settings: "⚙️", identity: "👤", photo: "📷" };
 function renderEventItem(e) {
   return '<div class="list-item">' +
     '<div class="li-icon">' + (EVENT_ICONS[e.type] || "📌") + "</div>" +

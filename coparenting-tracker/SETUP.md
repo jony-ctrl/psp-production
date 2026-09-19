@@ -120,6 +120,21 @@ In **Realtime Database → Rules**, paste:
           }
         }
       }
+    },
+    "photos": {
+      ".read": "auth != null && root.child('coparenting').child('members').child(auth.uid).exists()",
+      "$id": {
+        ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()",
+        "removed": {
+          ".write": "auth != null && !data.exists() && newData.child('by').val() === root.child('coparenting').child('members').child(auth.uid).child('role').val()"
+        }
+      }
+    },
+    "photofull": {
+      ".read": "auth != null && root.child('coparenting').child('members').child(auth.uid).exists()",
+      "$id": {
+        ".write": "auth != null && !data.exists() && root.child('coparenting').child('members').child(auth.uid).exists()"
+      }
     }
   }
 }
@@ -140,6 +155,11 @@ What this enforces, for **everyone** including the person who set it up:
   immutable.
 - Each side (Mom/Dad) can be claimed by exactly one account, once, and
   an account can't claim a side as someone else.
+- Photos are create-once and attributed like everything else; a photo
+  can be flagged once (hiding it from the grid, with a History entry)
+  but never edited or deleted. Images are compressed on-device
+  (~200 KB full size, ~25 KB thumbnails) and stored in the database
+  under `photos`/`photofull`; full images load only when opened.
 
 ## Step 5 — Deploy
 
