@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PSP Production Board</title>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Display:wght@400;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0b0e12;
+      --surface:  #141920;
+      --surface2: #1a2230;
+      --border:   #1e2a38;
+      --text:     #e2eaf4;
+      --muted:    #4a6280;
+      --primary:  #7cb9ff;
+      --green:    #4caf7d;
+      --green-bg: rgba(76,175,125,.12);
+      --amber:    #ffb300;
+      --amber-bg: rgba(255,179,0,.1);
+      --red:      #f44336;
+      --red-bg:   rgba(244,67,54,.1);
+      --gold:     #ffd700;
+    }
+
+    @keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes slideUp   { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes breathe   { 0%,100%{opacity:.55} 50%{opacity:1} }
+    @keyframes celebrate { 0%{box-shadow:0 0 0 0 rgba(76,175,125,.9)} 70%{box-shadow:0 0 0 24px rgba(76,175,125,0)} 100%{box-shadow:0 0 0 0 rgba(76,175,125,0)} }
+
+    html, body {
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    /* ── PIXEL SHIFT ── */
+    #pixel-shift {
+      width: 100vw;
+      height: 100vh;
+      transition: transform 4s ease-in-out;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      height: 10vh; min-height: 60px;
+      display: flex; flex-direction: column;
+      padding: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow: visible;
+      position: relative;
+      z-index: 20;
+    }
+    .header-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2vw;
+      flex: 1;
+    }
+    .brand { font-family:'Google Sans Display',sans-serif; font-size:clamp(.9rem,1.4vw,1.5rem); font-weight:700; }
+    .brand span { color: var(--primary); }
+    .header-center { display:flex; flex-direction:column; align-items:center; gap:1px; }
+    .week-label { font-size:clamp(.55rem,.7vw,.8rem); font-weight:500; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+    .goal-label { font-size:clamp(.7rem,.9vw,1rem); font-weight:700; color:var(--primary); }
+    .clock-block { text-align:right; }
+    #clock-time { font-family:'Roboto Mono',monospace; font-size:clamp(1rem,1.5vw,1.6rem); font-weight:500; line-height:1; }
+    #clock-date { font-size:clamp(.55rem,.7vw,.75rem); color:var(--muted); margin-top:2px; }
+    #refresh-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green); margin-left:5px; vertical-align:middle; animation:pulse 2s infinite; }
+
+    /* ── MAIN GRID ── */
+    main {
+      height: auto;
+      flex: 1;
+      padding: 1vh 1.2vw;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) minmax(180px, 1.1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: .8vh .8vw;
+    }
+
+    /* ── DEPT CARD ── */
+    .dept-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: clamp(8px,1vw,14px);
+      padding: clamp(8px,.9vh,.9vh) clamp(10px,.9vw,1vw);
+      position: relative;
+      display: flex; flex-direction: column; justify-content: space-between;
+      overflow: hidden;
+      animation: slideUp .4s ease both;
+    }
+    .dept-card.on-track { border-color:rgba(76,175,125,.4);  background:linear-gradient(150deg,var(--surface),rgba(76,175,125,.05)); }
+    .dept-card.close    { border-color:rgba(255,179,0,.4);   background:linear-gradient(150deg,var(--surface),rgba(255,179,0,.05)); }
+    .dept-card.almost   { border-color:rgba(255,213,0,.4);   background:linear-gradient(150deg,var(--surface),rgba(255,213,0,.05)); }
+    .dept-card.behind   { border-color:rgba(244,67,54,.4);   background:linear-gradient(150deg,var(--surface),rgba(244,67,54,.05)); }
+    .dept-card.neutral  { border-color:var(--border); background:var(--surface); }
+    .dept-card.celebrate { animation: celebrate .9s ease 3; }
+
+    .dept-name {
+      font-size:clamp(.55rem,.65vw,.78rem); font-weight:700;
+      text-transform:uppercase; letter-spacing:.09em; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      padding-right:52px;
+    }
+    .status-tag {
+      position:absolute; top:clamp(6px,.6vh,.6vh); right:clamp(8px,.7vw,.7vw);
+      font-size:clamp(.48rem,.55vw,.62rem); font-weight:700;
+      text-transform:uppercase; letter-spacing:.07em;
+      padding:2px 7px; border-radius:99px;
+    }
+    .on-track .status-tag { background:var(--green-bg); color:var(--green); }
+    .almost   .status-tag { background:rgba(255,213,0,.12); color:#ffd500; }
+    .close    .status-tag { background:var(--amber-bg); color:var(--amber); }
+    .behind   .status-tag { background:var(--red-bg);   color:var(--red);   }
+
+    .week-total {
+      font-family:'Google Sans Display',sans-serif;
+      font-size:clamp(1.6rem,2.8vw,3.2rem); font-weight:800; line-height:1;
+      margin:.2vh 0;
+    }
+    .on-track .week-total { color:var(--green); }
+    .almost   .week-total { color:#ffd500; }
+    .close    .week-total { color:var(--amber); }
+    .behind   .week-total { color:var(--red); }
+    .neutral  .week-total { color:var(--primary); }
+
+    .goal-text { font-size:clamp(.55rem,.62vw,.72rem); color:var(--muted); font-weight:500; margin-bottom:.4vh; }
+
+    .progress-wrap { background:var(--surface2); border-radius:99px; height:clamp(5px,.5vh,8px); overflow:hidden; margin-bottom:.3vh; }
+    .progress-bar  { height:100%; border-radius:99px; transition:width 1.2s cubic-bezier(.4,0,.2,1); }
+    .on-track .progress-bar { background:var(--green); }
+    .almost   .progress-bar { background:#ffd500; }
+    .close    .progress-bar { background:var(--amber); }
+    .behind   .progress-bar { background:var(--red); animation:breathe 2.5s ease-in-out infinite; }
+
+    .progress-labels { display:flex; justify-content:space-between; font-size:clamp(.5rem,.58vw,.68rem); color:var(--muted); margin-bottom:.4vh; }
+
+    .day-dots { display:flex; gap:clamp(3px,.3vw,5px); }
+    .day-dot  { flex:1; height:clamp(20px,2.2vh,28px); border-radius:5px; background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
+    .day-dot.has-data { background:rgba(124,185,255,.1); }
+    .day-name  { font-size:clamp(.42rem,.5vw,.58rem); font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); line-height:1; }
+    .day-count { font-size:clamp(.5rem,.58vw,.7rem); font-weight:700; color:var(--text); line-height:1; }
+    .day-dot.has-data .day-name { color:var(--primary); }
+
+    /* ── TOP PROGRESS BAR ── */
+    .top-progress {
+      padding: 0 2vw 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: visible;
+    }
+    .top-progress-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding-right: 120px; /* reserve space for count on the right */
+    }
+    .top-progress-count-wrap {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .top-progress-title {
+      font-size: clamp(.58rem,.7vw,.78rem);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+    }
+    .top-progress-count {
+      font-family: 'Google Sans Display', sans-serif;
+      font-size: clamp(.9rem,1.4vw,1.6rem);
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+    }
+    .top-progress-goal {
+      font-size: clamp(.55rem,.65vw,.72rem);
+      color: var(--muted);
+    }
+    .top-progress-wrap {
+      background: var(--surface2);
+      border-radius: 99px;
+      height: clamp(12px,1.4vh,20px);
+      overflow: visible;
+      position: relative;
+    }
+
+    /* Running man — sits on top of the bar end, vertically centered */
+    .runner-wrap {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -60%);
+      transition: left 1.2s cubic-bezier(.4,0,.2,1);
+      pointer-events: none;
+      z-index: 30;
+      animation: runner-bounce .3s steps(1) infinite;
+    }
+    @keyframes runner-bounce {
+      0%,100% { transform: translate(-50%, -60%) translateY(0); }
+      50%      { transform: translate(-50%, -60%) translateY(-2px); }
+    }
+
+    /* Speech bubble — appears in front of (to the left of) the runner */
+    .speech-bubble {
+      position: absolute;
+      bottom: 50%;
+      right: calc(100% + 8px);
+      transform: translateY(50%);
+      background: var(--surface);
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      padding: 4px 8px;
+      white-space: nowrap;
+      font-family: 'Google Sans', sans-serif;
+      font-size: clamp(.5rem, .65vw, .72rem);
+      font-weight: 600;
+      color: var(--primary);
+      opacity: 0;
+      transition: opacity .4s ease;
+      pointer-events: none;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 100%;
+      transform: translateY(-50%);
+      border: 5px solid transparent;
+      border-left-color: var(--primary);
+    }
+    .speech-bubble.visible { opacity: 1; }
+
+    
+    .top-progress-bar {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--primary), var(--green));
+      transition: width 1.2s cubic-bezier(.4,0,.2,1);
+      position: relative;
+    }
+    .top-progress-bar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.15) 50%, transparent 100%);
+      background-size: 200% 100%;
+      animation: shimmer 2.5s infinite;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    .top-progress-bar.on-track { background: linear-gradient(90deg, var(--primary), var(--green)); }
+    .top-progress-bar.almost   { background: linear-gradient(90deg, var(--primary), #ffd500); }
+    .top-progress-bar.close    { background: linear-gradient(90deg, var(--primary), var(--amber)); }
+    .top-progress-bar.behind   { background: linear-gradient(90deg, var(--red), #ff6b35); animation: breathe 2.5s ease-in-out infinite; }
+    /* ── SIDEBAR — two stacked panels ── */
+    .sidebar {
+      grid-column: 5;
+      grid-row: 1 / 4;
+      display: flex;
+      flex-direction: column;
+      gap: .8vh;
+    }
+
+    /* Top — rotating recognition */
+
+    /* Bottom — shipments */
+
+    /* Bottom half — rotating recognition */
+    .performer-card {
+      flex: 1;
+      background: linear-gradient(160deg, var(--surface), rgba(255,215,0,.04));
+      border: 1px solid rgba(255,215,0,.3);
+      border-radius: clamp(8px,1vw,14px);
+      padding: .8vh .8vw;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: .5vh;
+      position: relative; overflow: hidden;
+    }
+    .performer-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); }
+    .perf-title  { font-size:clamp(.55rem,.65vw,.75rem); font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--gold); text-align:center; }
+    .perf-trophy { font-size:clamp(1.4rem,2.2vw,2.8rem); line-height:1; }
+    .perf-name   { font-family:'Google Sans Display',sans-serif; font-size:clamp(1rem,1.6vw,2rem); font-weight:800; color:var(--text); text-align:center; line-height:1.1; }
+    .perf-label  { font-size:clamp(.48rem,.58vw,.68rem); color:var(--muted); font-weight:500; text-align:center; }
+
+    /* ── SHIPMENTS DISPLAY PANEL ── */
+    .ship-display {
+      flex: 1; background: var(--surface);
+      border: 1px solid rgba(124,185,255,.2);
+      border-radius: clamp(8px,1vw,14px);
+      padding: .8vh .8vw;
+      display: flex; flex-direction: column; gap: .4vh;
+      overflow: hidden; position: relative;
+      min-height: 0;
+    }
+    .ship-display::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background: linear-gradient(90deg,transparent,var(--primary),transparent);
+    }
+    /* ── SHIPMENTS OVERLAY ── */
+    #soverlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,.82); z-index:999;
+      align-items:center; justify-content:center;
+    }
+    #soverlay.open { display:flex; }
+    #sbox {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:18px; padding:24px 28px;
+      width:500px; max-width:95vw;
+      display:flex; flex-direction:column; gap:14px;
+      max-height:90vh; overflow:hidden;
+    }
+    #sbox-title {
+      font-family:'Google Sans Display',sans-serif; font-size:1.25rem;
+      font-weight:700; color:var(--text);
+      display:flex; align-items:center; justify-content:space-between; margin:0;
+    }
+    #sbox-title em { color:var(--primary); font-style:normal; }
+    .s-x { background:none; border:none; color:var(--muted); font-size:1.4rem; cursor:pointer; line-height:1; padding:0; }
+    .s-x:hover { color:var(--text); }
+    #sform { display:flex; gap:10px; align-items:flex-end; flex-shrink:0; }
+    .sf2 { display:flex; flex-direction:column; gap:5px; flex:1; }
+    .sf2 label { font-size:.68rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; }
+    .si2 {
+      background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+      color:var(--text); font-family:'Google Sans',sans-serif; font-size:.9rem;
+      padding:9px 12px; outline:none; width:100%; transition:border-color .15s;
+    }
+    .si2:focus { border-color:var(--primary); }
+    .si2::-webkit-calendar-picker-indicator { filter:invert(.4); cursor:pointer; }
+    #sadd-btn {
+      height:40px; padding:0 20px; background:var(--primary); color:#003063;
+      border:none; border-radius:20px; font-family:'Google Sans',sans-serif;
+      font-size:.85rem; font-weight:700; cursor:pointer; white-space:nowrap;
+      flex-shrink:0; transition:filter .2s;
+    }
+    #sadd-btn:hover { filter:brightness(1.1); }
+    #sadd-btn:disabled { opacity:.5; cursor:not-allowed; }
+    #slist2 { overflow-y:auto; display:flex; flex-direction:column; gap:8px; flex:1; min-height:60px; }
+    .srow {
+      display:flex; align-items:center; gap:10px;
+      background:var(--surface2); border-radius:8px; padding:10px 14px;
+    }
+    .srow.editing { outline:1px solid var(--primary); }
+    .srow-info { flex:1; min-width:0; }
+    .srow-name { font-size:.9rem; font-weight:600; color:var(--text); }
+    .srow-meta { font-size:.72rem; color:var(--muted); margin-top:2px; }
+    .sbtn { background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:6px; font-size:.8rem; transition:all .15s; }
+    .sedit { color:var(--muted); }
+    .sedit:hover { background:rgba(124,185,255,.12); color:var(--primary); }
+    .sdel2 { color:var(--muted); }
+    .sdel2:hover { background:rgba(244,67,54,.15); color:#f44336; }
+    #sempty { color:var(--muted); font-size:.85rem; text-align:center; padding:20px 0; }
+    #shint { font-size:.68rem; color:var(--muted); text-align:center; flex-shrink:0; }
+
+    /* ── TICKER ── */
+    #ticker {
+      height: 5vh; min-height: 32px;
+      background: #0a1628;
+      border-top: 2px solid #3b82f6;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+    #ticker-label {
+      background: #1d4ed8;
+      color: #bfdbfe;
+      font-size: clamp(.6rem,.72vw,.8rem);
+      font-weight: 800;
+      padding: 0 14px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      z-index: 1;
+    }
+    #ticker-track {
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      animation: ticker-scroll 20s linear infinite;
+      gap: 0;
+    }
+    #ticker-track.paused { animation-play-state: paused; }
+    @keyframes ticker-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .ticker-msg {
+      font-size: clamp(.75rem,.9vw,1rem);
+      color: #e2e8f0;
+      font-weight: 600;
+      padding: 0 32px;
+      letter-spacing: .02em;
+    }
+    .ticker-dot {
+      color: #3b82f6;
+      font-size: .7rem;
+      flex-shrink: 0;
+    }
+    #ticker-empty {
+      font-size: clamp(.55rem,.65vw,.72rem);
+      color: #3b82f6;
+      padding: 0 16px;
+      opacity: .5;
+    }
+
+    /* ── ANNOUNCEMENTS OVERLAY ── */
+    #aoverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.82); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    #aoverlay.open { display: flex; }
+    #abox {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; padding: 24px 28px;
+      width: 520px; max-width: 95vw;
+      display: flex; flex-direction: column; gap: 14px;
+      max-height: 90vh; overflow: hidden;
+    }
+    #abox h2 {
+      font-family: 'Google Sans Display', sans-serif; font-size: 1.2rem;
+      font-weight: 700; color: var(--text);
+      display: flex; align-items: center; justify-content: space-between; margin: 0;
+    }
+    #abox h2 em { color: var(--primary); font-style: normal; }
+    #atextarea {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: 'Google Sans', sans-serif; font-size: .9rem;
+      padding: 10px 14px; outline: none; resize: none;
+      transition: border-color .15s; width: 100%;
+    }
+    #atextarea:focus { border-color: var(--primary); }
+    #apost-btn {
+      height: 40px; padding: 0 20px; background: var(--primary); color: #003063;
+      border: none; border-radius: 20px; font-family: 'Google Sans', sans-serif;
+      font-size: .85rem; font-weight: 700; cursor: pointer; transition: filter .2s;
+      align-self: flex-end;
+    }
+    #apost-btn:hover { filter: brightness(1.1); }
+    #apost-btn:disabled { opacity: .5; cursor: not-allowed; }
+    #alist {
+      overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 40px;
+    }
+    .arow {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: var(--surface2); border-radius: 8px; padding: 10px 14px;
+    }
+    .arow-msg { flex: 1; font-size: .88rem; color: var(--text); line-height: 1.4; }
+    .arow-del { background:none; border:none; color:var(--muted); cursor:pointer; font-size:.85rem; padding:2px 6px; border-radius:50%; transition:all .15s; flex-shrink:0; }
+    .arow-del:hover { background:rgba(244,67,54,.15); color:#f44336; }
+    #ahint { font-size:.68rem; color:var(--muted); text-align:center; flex-shrink:0; }
+
+  </style>
+</head>
+<body>
+  <div id="pixel-shift">
+    <header>
+      <div class="header-top">
+        <div class="brand">PSP <span>Production</span></div>
+        <div class="header-center">
+          <div style="text-align:center">
+              <div class="week-label" id="week-range">This Week</div>
+              <div class="goal-label" id="goal-display">Goal: 90 covers / day</div>
+          </div>
+          <div style="font-size:clamp(.5rem,.62vw,.7rem);color:var(--muted);font-weight:500;margin-top:1px">
+            <span id="sewer-count" style="color:var(--primary);font-weight:700"></span>
+            <span id="sewer-label"></span>
+          </div>
+        </div>
+        <div class="clock-block">
+          <div id="clock-time">--:--:--</div>
+          <div id="clock-date">Loading… <span id="refresh-dot"></span></div>
+        </div>
+      </div>
+      <div class="top-progress">
+        <div style="display:flex;align-items:center;gap:1vw">
+          <span class="top-progress-title" style="white-space:nowrap">🪡 Covers Completed — Joining</span>
+          <div style="flex:1;position:relative">
+            <div class="top-progress-wrap">
+              <div class="top-progress-bar behind" id="joining-bar" style="width:0%"></div>
+              <div class="runner-wrap" id="runner" style="left:0%">
+                <div class="speech-bubble" id="speech-bubble"></div>
+                <svg width="32" height="48" viewBox="0 0 44 60" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;display:block;">
+                  <style>
+                    @keyframes rf-a{0%,49%{opacity:1}50%,100%{opacity:0}}
+                    @keyframes rf-b{0%,49%{opacity:0}50%,100%{opacity:1}}
+                    @keyframes rbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+                    .rf-a{animation:rf-a .25s steps(1) infinite}
+                    .rf-b{animation:rf-b .25s steps(1) infinite}
+                    .rbob{animation:rbob .25s steps(1) infinite;transform-box:fill-box;transform-origin:50% 50%}
+                  </style>
+                  <g class="rbob">
+                    <g class="rf-a">
+                      <rect x="14" y="0" width="14" height="2" fill="#3a2a0a"/>
+                      <rect x="12" y="2" width="18" height="8" fill="#f5c842"/>
+                      <rect x="24" y="6" width="4" height="3" fill="#fff"/>
+                      <rect x="25" y="7" width="2" height="2" fill="#333"/>
+                      <rect x="10" y="10" width="22" height="14" fill="#e8531a"/>
+                      <rect x="32" y="11" width="6" height="5" fill="#f5c842"/>
+                      <rect x="35" y="16" width="5" height="5" fill="#f5c842"/>
+                      <rect x="4"  y="11" width="6" height="5" fill="#f5c842"/>
+                      <rect x="2"  y="16" width="5" height="5" fill="#f5c842"/>
+                      <rect x="10" y="24" width="22" height="7" fill="#1a3a6c"/>
+                      <rect x="20" y="31" width="10" height="14" fill="#f5c842"/>
+                      <rect x="20" y="45" width="12" height="5" fill="#222"/>
+                      <rect x="6"  y="31" width="10" height="8"  fill="#f5c842"/>
+                      <rect x="3"  y="39" width="10" height="9"  fill="#f5c842"/>
+                      <rect x="2"  y="48" width="12" height="5"  fill="#222"/>
+                    </g>
+                    <g class="rf-b">
+                      <rect x="14" y="0" width="14" height="2" fill="#3a2a0a"/>
+                      <rect x="12" y="2" width="18" height="8" fill="#f5c842"/>
+                      <rect x="24" y="6" width="4" height="3" fill="#fff"/>
+                      <rect x="25" y="7" width="2" height="2" fill="#333"/>
+                      <rect x="10" y="10" width="22" height="14" fill="#e8531a"/>
+                      <rect x="4"  y="11" width="6" height="5" fill="#f5c842"/>
+                      <rect x="2"  y="16" width="5" height="5" fill="#f5c842"/>
+                      <rect x="32" y="11" width="6" height="5" fill="#f5c842"/>
+                      <rect x="35" y="16" width="5" height="5" fill="#f5c842"/>
+                      <rect x="10" y="24" width="22" height="7" fill="#1a3a6c"/>
+                      <rect x="12" y="31" width="10" height="14" fill="#f5c842"/>
+                      <rect x="10" y="45" width="12" height="5" fill="#222"/>
+                      <rect x="26" y="31" width="10" height="8"  fill="#f5c842"/>
+                      <rect x="28" y="39" width="10" height="9"  fill="#f5c842"/>
+                      <rect x="28" y="48" width="12" height="5"  fill="#222"/>
+                    </g>
+                  </g>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div style="white-space:nowrap;flex-shrink:0;text-align:right">
+            <span class="top-progress-count" id="joining-count">0</span>
+            <span class="top-progress-goal" id="joining-goal"> / 0 week goal</span>
+            <div id="ytd-badge" style="font-size:clamp(.45rem,.55vw,.62rem);color:var(--muted);font-weight:600;margin-top:1px;"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main id="grid"></main>
+    <div id="ticker">
+      <div id="ticker-label">📢 NEWS</div>
+      <div id="ticker-inner" style="flex:1;overflow:hidden;display:flex;align-items:center;">
+        <div id="ticker-track"><span id="ticker-empty">Press A to add announcements</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let DAILY_GOAL = 90;
+    const REFRESH_MS     = 2 * 60 * 1000;
+    const PIXEL_SHIFT_MS = 3 * 60 * 1000;
+
+    // ── TV ROTATION ───────────────────────────────────────────────────────
+    // Rotates to safety covers display after 30s, safety covers redirects back
+    const ROTATION_MS   = 30 * 1000;
+    const SAFETY_URL    = "https://admin.pspfab.com/display/safety-covers?key=2i62gFEDfM1H58PEqimJYt7c";
+    const SEWING_RETURN = "https://pspsewinglog.netlify.app/display.html";
+
+    // Progress bar element
+    const rotBar = document.createElement("div");
+    rotBar.style.cssText = "position:fixed;bottom:3px;left:0;width:100%;height:2px;background:rgba(255,255,255,.06);z-index:8888;";
+    const rotFill = document.createElement("div");
+    rotFill.style.cssText = "height:100%;width:0%;background:rgba(255,255,255,.25);";
+    rotBar.appendChild(rotFill);
+    document.body.appendChild(rotBar);
+
+    requestAnimationFrame(() => {
+      rotFill.style.transition = `width ${ROTATION_MS}ms linear`;
+      rotFill.style.width = "100%";
+    });
+
+    setTimeout(() => {
+      window.location.href = "https://pspsewinglog.netlify.app/bounce.html";
+    }, ROTATION_MS);
+
+    firebase.initializeApp({
+      apiKey:            "AIzaSyC4ZnWOG_PS0sh4XI8wWYfQLNG48LjeSVs",
+      authDomain:        "sewing-production-log.firebaseapp.com",
+      databaseURL:       "https://sewing-production-log-default-rtdb.firebaseio.com",
+      projectId:         "sewing-production-log",
+      storageBucket:     "sewing-production-log.firebasestorage.app",
+      messagingSenderId: "196320262022",
+      appId:             "1:196320262022:web:b35cc8a118e25da3735e07"
+    });
+    const db = firebase.database();
+
+    // Real-time listeners so changes from any device reflect instantly
+    db.ref("settings/daily_goal").on("value", snap => {
+      if (snap.exists() && snap.val() !== DAILY_GOAL) {
+        DAILY_GOAL = snap.val();
+        if (typeof load === "function") load();
+      }
+    });
+    db.ref("weights").on("value", snap => {
+      if (snap.exists()) {
+        Object.assign(DIFFICULTY, snap.val());
+        if (typeof load === "function") load();
+      }
+    });
+
+    const DEPT_ORDER = [
+      "Zippers","Skirt Prep","Prep (Handles, Ties, Hinges)",
+      "Profile","Plastics","Top Stitch","Closing","Pillows","Repair","Bags","Joining Prep"
+    ];
+    const NO_GOAL = ["Bags","Prep (Handles, Ties, Hinges)","Repair","Joining Prep"];
+    // DIFFICULTY weights — loaded from Firebase, fallback to defaults
+    const DIFFICULTY_DEFAULTS = {
+      "Bags":0.80,"Skirt Prep":0.65,"Prep (Handles, Ties, Hinges)":0.26,
+      "Top Stitch":1.45,"Profile":1.30,"Closing":1.57,
+      "Plastics":1.40,"Repair":0.90,"Joining":0.55,"Pillows":0.58,"Zippers":0.36,
+      "Joining Prep":1.00
+    };
+    let DIFFICULTY = Object.assign({}, DIFFICULTY_DEFAULTS);
+
+
+    // ── CLOCK ─────────────────────────────────────────────────────────────
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("clock-time").textContent =
+        now.toLocaleTimeString("en-CA", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+      document.getElementById("clock-date").innerHTML =
+        now.toLocaleDateString("en-CA", { weekday:"long", month:"long", day:"numeric" }) +
+        ` <span id="refresh-dot"></span>`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // ── DATE HELPERS ──────────────────────────────────────────────────────
+    function todayStr() { return new Date().toLocaleDateString("en-CA"); }
+
+    function yesterdayStr() {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      // Skip Sunday back to Friday
+      if (d.getDay() === 0) d.setDate(d.getDate() - 2);
+      return d.toLocaleDateString("en-CA");
+    }
+
+
+
+    function getWeekDates(offset) {
+      offset = offset || 0;
+      const today = new Date();
+      const mon   = new Date(today);
+      mon.setDate(today.getDate() - ((today.getDay() + 6) % 7) + (offset * 7));
+      return Array.from({ length: 5 }, (_, i) => {
+        const d = new Date(mon);
+        d.setDate(mon.getDate() + i);
+        return d.toLocaleDateString("en-CA");
+      });
+    }
+
+    // Days for the progress BAR — always actual days including today
+    function daysActual() {
+      const dow = new Date().getDay();
+      if (dow === 0 || dow === 6) return 5;
+      return dow;
+    }
+
+    // Days for STATUS — on Friday use 4 completed days until 4pm, then 5
+    function daysElapsed() {
+      const now  = new Date();
+      const dow  = now.getDay();
+      const hour = now.getHours();
+      if (dow === 0 || dow === 6) return 5;
+      // Before 4pm, today's entries aren't fully in — compare against completed days only
+      if (hour < 16) return Math.max(dow - 1, 1);
+      return dow;
+    }
+
+    // ── PIXEL SHIFT ───────────────────────────────────────────────────────
+    setInterval(() => {
+      const x = Math.round((Math.random() - 0.5) * 6);
+      document.getElementById("pixel-shift").style.transform = `translateX(${x}px)`;
+    }, PIXEL_SHIFT_MS);
+
+    // ── COUNT-UP ──────────────────────────────────────────────────────────
+    function animateCount(el, target) {
+      const start = performance.now();
+      const dur   = 900;
+      (function step(now) {
+        const p    = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(ease * target);
+        if (p < 1) requestAnimationFrame(step);
+      })(performance.now());
+    }
+
+    // ── RENDER ────────────────────────────────────────────────────────────
+    let prevTotals = {};
+
+    function render(rows, allRows = []) {
+      const weekDates    = getWeekDates(0);
+      const weekGoal     = DAILY_GOAL * daysElapsed();  // for dept card status
+      const barGoal      = DAILY_GOAL * daysActual();   // for joining bar & dept card display
+
+      document.getElementById("week-range").textContent =
+        weekDates[0] + " — " + weekDates[4];
+      document.getElementById("goal-display").textContent = `Goal: ${DAILY_GOAL} covers / day  ·  Week target so far: ${barGoal}`;
+
+      // Active sewers this week
+      const activeSewers = new Set(rows.map(r => r.employee)).size;
+      document.getElementById("sewer-count").textContent = activeSewers;
+      document.getElementById("sewer-label").textContent = ` sewer${activeSewers !== 1 ? "s" : ""} on the line this week`;
+
+      // ── JOINING PROGRESS BAR ──────────────────────────────────────────
+      const joiningTotal   = rows
+        .filter(r => weekDates.includes(r.date) && r.department === "Joining")
+        .reduce((s, r) => s + r.quantity, 0);
+      const joiningPct     = Math.min((joiningTotal / barGoal) * 100, 100);
+      const joiningElapsed = (daysActual() / 5) * 100;
+      const joiningRatio   = barGoal > 0 ? joiningTotal / barGoal : 0;
+      const joiningStatus  = joiningRatio >= 1.00 ? "on-track" : joiningRatio >= 0.90 ? "almost" : joiningRatio >= 0.80 ? "close" : "behind";
+
+      const joiningCountEl = document.getElementById("joining-count");
+      const joiningBar     = document.getElementById("joining-bar");
+      document.getElementById("joining-goal").textContent = ` / ${barGoal} week goal`;
+      animateCount(joiningCountEl, joiningTotal);
+
+      // ── YTD JOINING TOTAL ──────────────────────────────────────────────
+      const thisYear = new Date().getFullYear();
+      const ytdTotal = allRows
+        .filter(r => r.department === "Joining" && r.date && r.date.startsWith(String(thisYear)))
+        .reduce((s, r) => s + r.quantity, 0);
+      document.getElementById("ytd-badge").textContent = `${thisYear} YTD: ${ytdTotal.toLocaleString()} covers`;
+      joiningBar.className = `top-progress-bar ${joiningStatus}`;
+      setTimeout(() => {
+        joiningBar.style.width = joiningPct + "%";
+        document.getElementById("runner").style.left = Math.min(joiningPct, 95) + "%";
+      }, 80);
+
+      // Dept totals
+      const byDeptDate = {};
+      rows.forEach(r => {
+        if (!weekDates.includes(r.date)) return;
+        if (!byDeptDate[r.department]) byDeptDate[r.department] = {};
+        byDeptDate[r.department][r.date] = (byDeptDate[r.department][r.date] || 0) + r.quantity;
+      });
+
+      // Weighted employee scores
+      const byEmp = {};
+      rows.forEach(r => {
+        if (!weekDates.includes(r.date)) return;
+        const w = DIFFICULTY[r.department] || 1.0;
+        if (w > 0) byEmp[r.employee] = (byEmp[r.employee] || 0) + r.quantity * w;
+      });
+
+      const activeDepts = [...DEPT_ORDER];
+      Object.keys(byDeptDate).forEach(d => { if (!activeDepts.includes(d)) activeDepts.push(d); });
+
+      const grid = document.getElementById("grid");
+
+      // Remove stale cards
+      [...grid.querySelectorAll(".dept-card")].forEach(c => {
+        if (!activeDepts.includes(c.dataset.dept)) c.remove();
+      });
+
+      activeDepts.forEach((dept, idx) => {
+        const dateMap   = byDeptDate[dept] || {};
+        const weekTotal = weekDates.reduce((s, d) => s + (dateMap[d] || 0), 0);
+        const pct       = Math.min((weekTotal / barGoal) * 100, 100);
+        const noGoal    = NO_GOAL.includes(dept);
+
+        // Compare total against completed-days target (not pace ratio)
+        // weekGoal = 90 × daysElapsed (4 on Friday, so 360)
+        const ratio     = weekGoal > 0 ? weekTotal / weekGoal : 0;
+        const status    = noGoal ? "neutral"
+          : ratio >= 1.00 ? "on-track"
+          : ratio >= 0.90 ? "almost"
+          : ratio >= 0.80 ? "close"
+          : "behind";
+        const statusLbl = noGoal ? null
+          : ratio >= 1.00 ? "On Track"
+          : ratio >= 0.90 ? "Almost"
+          : ratio >= 0.80 ? "Close"
+          : "Behind";
+
+        let card = grid.querySelector(`.dept-card[data-dept="${CSS.escape(dept)}"]`);
+        const isNew = !card;
+        if (isNew) {
+          card = document.createElement("div");
+          card.dataset.dept = dept;
+          card.style.animationDelay = (idx * 0.04) + "s";
+        }
+
+        // Celebrate if just hit goal
+        if (!isNew && (prevTotals[dept] || 0) < barGoal && weekTotal >= barGoal) {
+          card.classList.add("celebrate");
+          setTimeout(() => card.classList.remove("celebrate"), 3500);
+        }
+        prevTotals[dept] = weekTotal;
+
+        card.className = `dept-card ${status}`;
+        card.innerHTML = `
+          <div class="dept-name">${dept}</div>
+          ${statusLbl ? `<div class="status-tag">${statusLbl}</div>` : ""}
+          <div class="week-total">0</div>
+          ${noGoal
+            ? `<div class="goal-text" style="opacity:.45">no daily target</div>`
+            : `<div class="goal-text">/ ${barGoal} goal</div>`}
+          ${noGoal ? "" : `
+          <div class="progress-wrap">
+            <div class="progress-bar" style="width:0%" data-pct="${pct}"></div>
+          </div>
+          <div class="progress-labels">
+            <span>${Math.round(pct)}%</span>
+            <span>${barGoal > weekTotal ? (barGoal - weekTotal) + " to go" : "✓ Goal reached"}</span>
+          </div>`}
+          <div class="day-dots">
+            ${weekDates.map((d, i) => {
+              const n = dateMap[d] || 0;
+              return `<div class="day-dot ${n > 0 ? "has-data" : ""}">
+                <span class="day-name">${["M","T","W","T","F"][i]}</span>
+                <span class="day-count">${n > 0 ? n : "—"}</span>
+              </div>`;
+            }).join("")}
+          </div>`;
+
+        if (isNew) {
+          const perf = grid.querySelector(".performer-card");
+          grid.insertBefore(card, perf || null);
+        }
+
+        // Animate count-up + progress bar
+        animateCount(card.querySelector(".week-total"), weekTotal);
+        const bar = card.querySelector(".progress-bar");
+        if (bar) setTimeout(() => bar.style.width = pct + "%", 80);
+      });
+
+      // Sidebar — create once with both panels
+      let sidebar = grid.querySelector(".sidebar");
+      if (!sidebar) {
+        sidebar = document.createElement("div");
+        sidebar.className = "sidebar";
+
+        // Top: rotating recognition panel
+        const perf = document.createElement("div");
+        perf.className = "performer-card";
+        perf.id = "performer-card";
+        sidebar.appendChild(perf);
+
+        grid.appendChild(sidebar);
+
+        // Shipments panel
+        var sd = document.createElement("div");
+        sd.id = "ship-display";
+        sd.className = "ship-display";
+        sidebar.appendChild(sd);
+
+
+      }
+      const perf   = grid.querySelector(".performer-card");
+      const sorted = Object.entries(byEmp).sort((a, b) => b[1] - a[1]);
+
+      // Build dept leaderboard data
+      const byDept = {};
+      rows.forEach(r => {
+        if (!weekDates.includes(r.date)) return;
+        if (!byDept[r.department]) byDept[r.department] = { total: 0, people: {} };
+        byDept[r.department].total += r.quantity;
+        byDept[r.department].people[r.employee] = (byDept[r.department].people[r.employee] || 0) + r.quantity;
+      });
+
+      const goalDepts    = DEPT_ORDER.filter(d => !NO_GOAL.includes(d));
+      const deptRankings = goalDepts
+        .filter(d => byDept[d])
+        .map(d => ({ dept: d, total: byDept[d].total, people: byDept[d].people, pct: Math.min((byDept[d].total / weekGoal) * 100, 100) }))
+        .sort((a, b) => b.pct - a.pct);
+
+      const hitGoal = deptRankings.filter(d => d.total >= weekGoal);
+
+      // 3 slides: performer, dept leaderboard, shoutout
+      const slides = [];
+
+      // Slide 1 — Performer of the week
+      slides.push(sorted.length ? `
+        <div class="perf-title">⭐ Performer of the Week</div>
+        <div class="perf-trophy">🏆</div>
+        <div class="perf-name">${sorted[0][0]}</div>
+        <div class="perf-label">Outstanding work this week!</div>
+        ${sorted.length > 1 ? `
+        <div style="width:100%;margin-top:.3vh;display:flex;flex-direction:column;gap:.3vh">
+          ${sorted.slice(1, 5).map(([name, score], i) => `
+            <div style="display:flex;align-items:center;gap:.4vw;background:var(--surface2);border-radius:6px;padding:.3vh .5vw">
+              <span style="font-size:clamp(.48rem,.55vw,.65rem);font-weight:700;color:var(--muted);min-width:14px">#${i+2}</span>
+              <span style="flex:1;font-size:clamp(.52rem,.62vw,.72rem);font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+              <div style="width:32%;height:3px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="height:100%;background:var(--primary);border-radius:99px;width:${Math.round((score/sorted[0][1])*100)}%"></div>
+              </div>
+            </div>`).join("")}
+        </div>` : ""}`
+        : `<div class="perf-title">⭐ Performer of the Week</div>
+           <div class="perf-trophy">🏆</div>
+           <div class="perf-label" style="color:var(--muted)">No data yet</div>`);
+
+      // Slide 2 — Department leaderboard
+      slides.push(deptRankings.length ? `
+        <div class="perf-title">🏭 Department Leaderboard</div>
+        <div style="width:100%;display:flex;flex-direction:column;gap:.4vh;margin-top:.5vh">
+          ${deptRankings.slice(0, 8).map((d, i) => {
+            const color = d.pct >= 100 ? "var(--green)" : d.pct >= 90 ? "#ffd500" : d.pct >= 80 ? "var(--amber)" : "var(--red)";
+            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `<span style="font-size:clamp(.48rem,.55vw,.65rem);color:var(--muted);min-width:18px;text-align:center">#${i+1}</span>`;
+            return `<div style="display:flex;align-items:center;gap:.5vw;background:var(--surface2);border-radius:6px;padding:.35vh .5vw">
+              <span style="font-size:.9rem;min-width:18px;text-align:center">${medal}</span>
+              <span style="flex:1;font-size:clamp(.5rem,.6vw,.7rem);font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.dept}</span>
+              <span style="font-size:clamp(.5rem,.6vw,.7rem);font-weight:700;color:${color};white-space:nowrap">${Math.round(d.pct)}%</span>
+              <div style="width:28%;height:3px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="height:100%;background:${color};border-radius:99px;width:${d.pct}%"></div>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>`
+        : `<div class="perf-title">🏭 Department Leaderboard</div>
+           <div class="perf-label" style="color:var(--muted);margin-top:1vh">No data yet</div>`);
+
+      // Slide 3 — Goal shoutout (or "keep going" if none hit)
+      slides.push(hitGoal.length ? `
+        <div class="perf-title">🎉 Goal Reached!</div>
+        <div style="width:100%;display:flex;flex-direction:column;gap:.6vh;margin-top:.8vh">
+          ${hitGoal.map(d => {
+            const contributors = Object.keys(d.people).sort((a,b) => d.people[b] - d.people[a]);
+            return `<div style="background:var(--green-bg);border:1px solid rgba(76,175,125,.3);border-radius:8px;padding:.5vh .6vw">
+              <div style="font-size:clamp(.55rem,.65vw,.75rem);font-weight:700;color:var(--green);margin-bottom:2px">${d.dept}</div>
+              <div style="font-size:clamp(.48rem,.55vw,.62rem);color:var(--on-surface-var,#7a8fa8)">${contributors.join(" · ")}</div>
+            </div>`;
+          }).join("")}
+        </div>`
+        : `<div class="perf-title">💪 Keep Pushing!</div>
+           <div class="perf-trophy" style="font-size:clamp(1.5rem,2.5vw,3rem)">🎯</div>
+           <div class="perf-label" style="margin-top:.5vh">No department has hit the weekly target yet.</div>
+           ${deptRankings.length ? `<div class="perf-label" style="margin-top:.3vh;color:var(--primary)">${deptRankings[0].dept} is closest at ${Math.round(deptRankings[0].pct)}%</div>` : ""}`);
+
+      // Slide 4 — Yesterday's Champion
+      const yest     = yesterdayStr();
+      const yestRows = allRows.filter(r => r.date === yest);
+      const byEmpYest = {};
+      yestRows.forEach(r => {
+        const w = DIFFICULTY[r.department] || 1.0;
+        if (w > 0) byEmpYest[r.employee] = (byEmpYest[r.employee] || 0) + r.quantity * w;
+      });
+      const sortedYest = Object.entries(byEmpYest).sort((a, b) => b[1] - a[1]);
+
+      slides.push(sortedYest.length ? `
+        <div class="perf-title">🌟 Yesterday's Champion</div>
+        <div class="perf-trophy">🥇</div>
+        <div class="perf-name">${sortedYest[0][0]}</div>
+        <div class="perf-label">${yest}</div>
+        ${sortedYest.length > 1 ? `
+        <div style="width:100%;margin-top:.3vh;display:flex;flex-direction:column;gap:.3vh">
+          ${sortedYest.slice(1, 5).map(([name, score], i) => `
+            <div style="display:flex;align-items:center;gap:.4vw;background:var(--surface2);border-radius:6px;padding:.3vh .5vw">
+              <span style="font-size:clamp(.48rem,.55vw,.65rem);font-weight:700;color:var(--muted);min-width:14px">#${i+2}</span>
+              <span style="flex:1;font-size:clamp(.52rem,.62vw,.72rem);font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+              <div style="width:32%;height:3px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div style="height:100%;background:var(--gold);border-radius:99px;width:${Math.round((score/sortedYest[0][1])*100)}%"></div>
+              </div>
+            </div>`).join("")}
+        </div>` : ""}`
+        : `<div class="perf-title">🌟 Yesterday's Champion</div>
+           <div class="perf-trophy">🥇</div>
+           <div class="perf-label" style="color:var(--muted)">No data for ${yest}</div>`);
+
+      // Store slides and start rotation
+      perf._slides = slides;
+      if (perf._slideIdx === undefined) perf._slideIdx = 0;
+      perf.innerHTML = slides[perf._slideIdx];
+
+      if (perf._rotateTimer) clearInterval(perf._rotateTimer);
+      perf._rotateTimer = setInterval(() => {
+        perf._slideIdx = (perf._slideIdx + 1) % slides.length;
+        perf.style.opacity = "0";
+        perf.style.transition = "opacity .5s ease";
+        setTimeout(() => {
+          perf.innerHTML = slides[perf._slideIdx];
+          perf.style.opacity = "1";
+        }, 500);
+      }, 12000); // rotate every 15 seconds
+    }
+
+    // ── LOAD ──────────────────────────────────────────────────────────────
+    function load() {
+      const dates = getWeekDates(0);
+      db.ref("production_logs").once("value").then(snap => {
+        const rows = [], allRows = [];
+        snap.forEach(child => {
+          const v = child.val();
+          allRows.push(v);
+          if (dates.includes(v.date)) rows.push(v);
+        });
+        render(rows, allRows);
+      });
+    }
+
+    // ── RUNNING MAN MESSAGES ─────────────────────────────────────────────
+    const MESSAGES = [
+      "Let's go! 💨", "Keep it up! 🔥", "Almost there!",
+      "You got this!", "Push push push!", "On fire! 🔥",
+      "Great work!", "Don't stop now!", "Looking good!",
+      "Crushing it! 💪", "Stay focused!", "Eyes on the goal!",
+      "Beast mode! 🦁", "Unstoppable!", "Let's goooo!",
+      "One more! 🎯", "Power through!", "Champions work!",
+    ];
+
+    let _bubbleTimer;
+    function showNextMessage() {
+      const bubble = document.getElementById("speech-bubble");
+      if (!bubble) return;
+      const msg = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+      bubble.textContent = msg;
+      bubble.classList.add("visible");
+      setTimeout(() => bubble.classList.remove("visible"), 2800);
+    }
+
+    // Show a message every 8 seconds
+    showNextMessage();
+    _bubbleTimer = setInterval(showNextMessage, 8000);
+
+    load();
+    setInterval(load, REFRESH_MS);
+
+    
+  </script>
+
+<!-- ── TICKER ── -->
+<!-- already in header via main script -->
+
+<!-- ── SHIPMENTS OVERLAY (press S) ── -->
+<div id="soverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#1a1f25;border:1px solid #3a4452;border-radius:18px;padding:24px 28px;width:500px;max-width:95vw;display:flex;flex-direction:column;gap:14px;max-height:90vh;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Google Sans Display',sans-serif;font-size:1.2rem;font-weight:700;color:#e2eaf4;">📦 <span style="color:#7cb9ff">Shipments</span></span>
+      <button onclick="document.getElementById('soverlay').style.display='none'" style="background:none;border:none;color:#4a6280;font-size:1.4rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-end;">
+      <div style="display:flex;flex-direction:column;gap:5px;flex:1;">
+        <label style="font-size:.68rem;font-weight:700;color:#4a6280;text-transform:uppercase;letter-spacing:.07em;">Customer</label>
+        <input id="s-cust" type="text" placeholder="e.g. Costco" autocomplete="off"
+          style="background:#252c35;border:1px solid #3a4452;border-radius:8px;color:#e2eaf4;font-size:.9rem;padding:9px 12px;outline:none;width:100%;"
+          onfocus="this.style.borderColor='#7cb9ff'" onblur="this.style.borderColor='#3a4452'"/>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;max-width:160px;">
+        <label style="font-size:.68rem;font-weight:700;color:#4a6280;text-transform:uppercase;letter-spacing:.07em;">Ship Date</label>
+        <input id="s-date" type="date"
+          style="background:#252c35;border:1px solid #3a4452;border-radius:8px;color:#e2eaf4;font-size:.9rem;padding:9px 12px;outline:none;"
+          onfocus="this.style.borderColor='#7cb9ff'" onblur="this.style.borderColor='#3a4452'"/>
+      </div>
+      <button id="s-add-btn" onclick="sAdd()"
+        style="height:40px;padding:0 20px;background:#7cb9ff;color:#003063;border:none;border-radius:20px;font-weight:700;font-size:.85rem;cursor:pointer;white-space:nowrap;">
+        Add
+      </button>
+    </div>
+    <div id="s-list" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;max-height:280px;min-height:40px;"></div>
+    <div style="font-size:.68rem;color:#4a6280;text-align:center;">Press <strong>S</strong> or <strong>Esc</strong> to close</div>
+  </div>
+</div>
+
+<!-- ── ANNOUNCEMENTS OVERLAY (press A) ── -->
+<div id="aoverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#1a1f25;border:1px solid #3a4452;border-radius:18px;padding:24px 28px;width:520px;max-width:95vw;display:flex;flex-direction:column;gap:14px;max-height:90vh;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Google Sans Display',sans-serif;font-size:1.2rem;font-weight:700;color:#e2eaf4;">📢 <span style="color:#7cb9ff">Announcements</span></span>
+      <button onclick="document.getElementById('aoverlay').style.display='none'" style="background:none;border:none;color:#4a6280;font-size:1.4rem;cursor:pointer;">✕</button>
+    </div>
+    <textarea id="a-msg" rows="3" placeholder="Type announcement… (Enter to post)"
+      style="background:#252c35;border:1px solid #3a4452;border-radius:8px;color:#e2eaf4;font-size:.9rem;padding:10px 14px;outline:none;resize:none;width:100%;"
+      onfocus="this.style.borderColor='#7cb9ff'" onblur="this.style.borderColor='#3a4452'"></textarea>
+    <button onclick="aPost()"
+      style="height:40px;padding:0 20px;background:#7cb9ff;color:#003063;border:none;border-radius:20px;font-weight:700;font-size:.85rem;cursor:pointer;align-self:flex-end;">
+      Post
+    </button>
+    <div id="a-list" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px;max-height:200px;min-height:30px;"></div>
+    <div style="font-size:.68rem;color:#4a6280;text-align:center;">Press <strong>A</strong> or <strong>Esc</strong> to close</div>
+  </div>
+</div>
+
+<script>
+// ── KEY HANDLERS ──────────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 's' || e.key === 'S') {
+    var o = document.getElementById('soverlay');
+    if (o.style.display === 'flex') { o.style.display = 'none'; } 
+    else { sOpen(); }
+  }
+  if (e.key === 'a' || e.key === 'A') {
+    var o = document.getElementById('aoverlay');
+    if (o.style.display === 'flex') { o.style.display = 'none'; } 
+    else { o.style.display = 'flex'; setTimeout(function(){ document.getElementById('a-msg').focus(); }, 50); }
+  }
+  if (e.key === 'l' || e.key === 'L') {
+    var o = document.getElementById('score-overlay');
+    if (o.style.display === 'flex') { closeScoreboard(); }
+    else { openScoreboard(); }
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('soverlay').style.display = 'none';
+    document.getElementById('aoverlay').style.display = 'none';
+    closeScoreboard();
+  }
+});
+
+// Enter in inputs
+document.getElementById('s-cust').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); sAdd(); } });
+document.getElementById('s-date').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); sAdd(); } });
+document.getElementById('a-msg').addEventListener('keydown',  function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aPost(); } });
+
+// ── SHIPMENTS ─────────────────────────────────────────────────────────────
+var sEditId = null;
+
+function sOpen() {
+  document.getElementById('s-cust').value = '';
+  document.getElementById('s-date').value = new Date().toLocaleDateString('en-CA');
+  sEditId = null;
+  document.getElementById('s-add-btn').textContent = 'Add';
+  document.getElementById('soverlay').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('s-cust').focus(); }, 50);
+}
+
+function sAdd() {
+  var cust = document.getElementById('s-cust').value.trim();
+  var date = document.getElementById('s-date').value;
+  if (!cust || !date) return;
+  var btn = document.getElementById('s-add-btn');
+  btn.disabled = true; btn.textContent = '…';
+  var op = sEditId
+    ? db.ref('shipments/' + sEditId).update({ customer: cust, date: date })
+    : db.ref('shipments').push({ customer: cust, date: date });
+  op.then(function() {
+    document.getElementById('s-cust').value = '';
+    document.getElementById('s-date').value = new Date().toLocaleDateString('en-CA');
+    sEditId = null;
+    btn.textContent = 'Add';
+    document.getElementById('s-cust').focus();
+  }).catch(function(e) { alert('Error: ' + e.message); })
+    .finally(function() { btn.disabled = false; });
+}
+
+function sEdit(id, cust, date) {
+  sEditId = id;
+  document.getElementById('s-cust').value = cust;
+  document.getElementById('s-date').value = date;
+  document.getElementById('s-add-btn').textContent = 'Save';
+  document.getElementById('s-cust').focus();
+}
+
+function sDel(id) {
+  if (confirm('Delete this shipment?')) db.ref('shipments/' + id).remove();
+}
+
+function aDel(id) {
+  db.ref('announcements/' + id).remove();
+}
+
+// ── ANNOUNCEMENTS ─────────────────────────────────────────────────────────
+function aPost() {
+  var msg = document.getElementById('a-msg').value.trim();
+  if (!msg) return;
+  db.ref('announcements').push({ msg: msg, ts: Date.now() }).then(function() {
+    document.getElementById('a-msg').value = '';
+  });
+}
+
+// ── FIREBASE LISTENERS ────────────────────────────────────────────────────
+db.ref('shipments').on('value', function(snap) {
+  var all = [];
+  snap.forEach(function(c) { all.push(Object.assign({ id: c.key }, c.val())); });
+  all.sort(function(a,b) { return a.date < b.date ? -1 : 1; });
+  console.log('shipments:', all.length);
+
+  // Update overlay list
+  var list = document.getElementById('s-list');
+  if (!all.length) {
+    list.innerHTML = '<div style="color:#4a6280;text-align:center;padding:10px;font-size:.85rem;">No shipments yet</div>';
+  } else {
+    list.innerHTML = all.map(function(s) {
+      var d = Math.round((new Date(s.date+'T00:00:00') - new Date(new Date().toLocaleDateString('en-CA')+'T00:00:00')) / 86400000);
+      var lbl = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d < 0 ? Math.abs(d)+'d ago' : 'In '+d+' days';
+      var col = d < 0 ? '#4a6280' : d === 0 ? '#f44336' : d <= 2 ? '#ffb300' : '#4caf7d';
+      return '<div style="display:flex;align-items:center;gap:10px;background:#1e242c;border-radius:8px;padding:10px 14px;">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:.9rem;font-weight:600;color:#e2eaf4;">'+s.customer+'</div>'
+        + '<div style="font-size:.72rem;color:#4a6280;margin-top:2px;">'+s.date+' &nbsp;·&nbsp; <span style="color:'+col+';font-weight:600;">'+lbl+'</span></div>'
+        + '</div>'
+        + '<button onclick="sEdit(\''+s.id+'\',\''+s.customer.replace(/'/g,"\\'")+ '\',\''+s.date+'\')" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;color:#4a6280;font-size:.8rem;" onmouseover="this.style.color=\'#7cb9ff\'" onmouseout="this.style.color=\'#4a6280\'">✏️</button>'
+        + '<button onclick="sDel(\''+s.id+'\')" style="background:none;border:none;cursor:pointer;padding:4px;border-radius:50%;color:#4a6280;font-size:.85rem;" onmouseover="this.style.color=\'#f44336\'" onmouseout="this.style.color=\'#4a6280\'">🗑</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Update display panel
+  var panel = document.getElementById('ship-display');
+  if (!panel) return;
+  var today = new Date().toLocaleDateString('en-CA');
+  var future = all.filter(function(s) { return s.date >= today; });
+
+  var title = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:.3vh;">'
+    + '<span style="font-size:.85rem;">📦</span>'
+    + '<span style="font-size:clamp(.5rem,.6vw,.7rem);font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#7cb9ff;">Outgoing Shipments</span>'
+    + '</div>';
+
+  if (!future.length) {
+    panel.innerHTML = title + '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:.45;">'
+      + '<span style="font-size:1.4rem;">📭</span>'
+      + '<span style="font-size:clamp(.5rem,.6vw,.7rem);color:#4a6280;">No shipments scheduled</span>'
+      + '<span style="font-size:clamp(.38rem,.46vw,.52rem);color:#4a6280;">Press S to add</span>'
+      + '</div>';
+    return;
+  }
+
+  panel.innerHTML = title + future.slice(0,9).map(function(s) {
+    var d = Math.round((new Date(s.date+'T00:00:00') - new Date(today+'T00:00:00')) / 86400000);
+    var col = d === 0 ? '#f44336' : d <= 2 ? '#ffb300' : '#4caf7d';
+    var lbl = d === 0 ? 'SHIPS TODAY' : d === 1 ? 'TOMORROW' : d+' DAYS';
+    var dot = d === 0 ? 'animation:pulse 1s infinite;' : '';
+    var ds = new Date(s.date+'T00:00:00').toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric'});
+    return '<div style="display:flex;align-items:center;gap:.5vw;padding:.4vh .5vw;border-radius:7px;background:#1e242c;border-left:3px solid '+col+';">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:clamp(.58rem,.72vw,.82rem);font-weight:800;color:#e2eaf4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.customer+'</div>'
+      + '<div style="font-size:clamp(.4rem,.48vw,.56rem);color:#4a6280;">'+ds+'</div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'
+      + '<div style="width:5px;height:5px;border-radius:50%;background:'+col+';'+dot+'"></div>'
+      + '<span style="font-size:clamp(.4rem,.5vw,.58rem);font-weight:800;color:'+col+';white-space:nowrap;">'+lbl+'</span>'
+      + '</div></div>';
+  }).join('')
+  + (future.length > 9
+    ? '<div style="font-size:clamp(.36rem,.44vw,.5rem);color:#4a6280;text-align:center;margin-top:.2vh;">+' + (future.length-9) + ' more · Press S</div>'
+    : '<div style="font-size:clamp(.36rem,.44vw,.5rem);color:#4a6280;text-align:center;margin-top:.2vh;opacity:.4;">Press S to manage</div>');
+});
+
+db.ref('announcements').on('value', function(snap) {
+  var items = [];
+  snap.forEach(function(c) { items.push(Object.assign({ id: c.key }, c.val())); });
+  items.sort(function(a,b) { return b.ts - a.ts; });
+
+  // Update overlay list
+  var el = document.getElementById('a-list');
+  if (!items.length) {
+    el.innerHTML = '<div style="color:#4a6280;font-size:.85rem;text-align:center;padding:10px;">No announcements</div>';
+  } else {
+    el.innerHTML = items.map(function(a) {
+      return '<div style="display:flex;align-items:flex-start;gap:10px;background:#1e242c;border-radius:8px;padding:10px 14px;">'
+        + '<div style="flex:1;font-size:.88rem;color:#e2eaf4;line-height:1.4;">'+a.msg+'</div>'
+        + '<button onclick="aDel(\''+a.id+'\')" style="background:none;border:none;cursor:pointer;color:#4a6280;font-size:.85rem;flex-shrink:0;" onmouseover="this.style.color=\'#f44336\'" onmouseout="this.style.color=\'#4a6280\'">🗑</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Update ticker
+  var track = document.getElementById('ticker-track');
+  if (!track) return;
+  if (!items.length) {
+    track.innerHTML = '<span style="font-size:clamp(.6rem,.72vw,.82rem);color:#4a6280;padding:0 16px;opacity:.5;">Press A to add announcements</span>';
+    track.style.animation = 'none';
+    return;
+  }
+  var msgs = items.map(function(a) {
+    return '<span style="font-size:clamp(.6rem,.72vw,.82rem);color:#e2eaf4;padding:0 40px;">'+a.msg+'</span>'
+      + '<span style="color:#7cb9ff;font-size:.6rem;">◆</span>';
+  }).join('');
+  track.innerHTML = msgs + msgs;
+  track.style.animation = '';
+  var dur = Math.max(15, items.reduce(function(s,a){ return s+a.msg.length; }, 0) * 0.3);
+  track.style.animationDuration = dur + 's';
+});
+</script>
+
+<!-- SCOREBOARD OVERLAY -->
+<div id="score-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#1a1f25;border:1px solid #3a4452;border-radius:18px;padding:24px 28px;width:720px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span style="font-family:'Google Sans Display',sans-serif;font-size:1.2rem;font-weight:700;color:#e2eaf4;">🏆 <span style="color:#7cb9ff">Weekly Scoreboard</span></span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="score-week-label" style="font-size:.75rem;color:#4a6280;"></span>
+        <button onclick="closeScoreboard()" style="background:none;border:none;color:#4a6280;font-size:1.4rem;cursor:pointer;line-height:1;">✕</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button id="tab-scores" onclick="switchTab('scores')" style="padding:6px 16px;border-radius:20px;border:1px solid #7cb9ff;background:#7cb9ff;color:#003063;font-weight:700;font-size:.8rem;cursor:pointer;">📊 Scores</button>
+      <button id="tab-weights" onclick="switchTab('weights')" style="padding:6px 16px;border-radius:20px;border:1px solid #3a4452;background:transparent;color:#7a8fa8;font-weight:600;font-size:.8rem;cursor:pointer;">⚖️ Weights</button>
+    </div>
+    <div id="panel-scores" style="overflow-y:auto;flex:1;">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+        <thead>
+          <tr style="border-bottom:1px solid #3a4452;">
+            <th style="text-align:left;padding:8px 10px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Rank</th>
+            <th style="text-align:left;padding:8px 10px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Sewer</th>
+            <th style="text-align:left;padding:8px 10px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Department</th>
+            <th style="text-align:right;padding:8px 10px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Units</th>
+            <th style="text-align:right;padding:8px 10px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Score</th>
+            <th style="padding:8px 10px;"></th>
+          </tr>
+        </thead>
+        <tbody id="score-tbody"></tbody>
+      </table>
+    </div>
+    <div id="panel-weights" style="display:none;overflow-y:auto;flex:1;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid #3a4452;">
+            <th style="text-align:left;padding:8px 12px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Department</th>
+            <th style="text-align:center;padding:8px 12px;color:#4a6280;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;">Weight</th>
+            <th style="padding:8px 12px;"></th>
+          </tr>
+        </thead>
+        <tbody id="weights-tbody"></tbody>
+      </table>
+      <div style="margin-top:12px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="resetWeights()" style="padding:8px 18px;border-radius:20px;border:1px solid #3a4452;background:transparent;color:#7a8fa8;font-size:.8rem;cursor:pointer;">Reset Defaults</button>
+        <button onclick="saveWeights()" style="padding:8px 20px;border-radius:20px;border:none;background:#7cb9ff;color:#003063;font-weight:700;font-size:.8rem;cursor:pointer;">💾 Save to Firebase</button>
+      </div>
+      <div id="weights-status" style="font-size:.72rem;color:#4a6280;text-align:right;margin-top:6px;min-height:16px;"></div>
+    </div>
+    <div style="font-size:.68rem;color:#4a6280;text-align:center;flex-shrink:0;">Press <strong>L</strong> or <strong>Esc</strong> to close</div>
+  </div>
+</div>
+
+<script>
+function openScoreboard() {
+  document.getElementById("score-overlay").style.display = "flex";
+  switchTab("scores");
+  buildScoreboard();
+}
+
+function closeScoreboard() {
+  document.getElementById("score-overlay").style.display = "none";
+}
+
+function switchTab(tab) {
+  document.getElementById("panel-scores").style.display  = tab === "scores"  ? "block" : "none";
+  document.getElementById("panel-weights").style.display = tab === "weights" ? "block" : "none";
+  document.getElementById("tab-scores").style.background  = tab === "scores"  ? "#7cb9ff" : "transparent";
+  document.getElementById("tab-scores").style.color       = tab === "scores"  ? "#003063" : "#7a8fa8";
+  document.getElementById("tab-scores").style.borderColor = tab === "scores"  ? "#7cb9ff" : "#3a4452";
+  document.getElementById("tab-weights").style.background  = tab === "weights" ? "#7cb9ff" : "transparent";
+  document.getElementById("tab-weights").style.color       = tab === "weights" ? "#003063" : "#7a8fa8";
+  document.getElementById("tab-weights").style.borderColor = tab === "weights" ? "#7cb9ff" : "#3a4452";
+  if (tab === "weights") buildWeightsEditor();
+}
+
+function buildWeightsEditor() {
+  const depts = Object.keys(DIFFICULTY_DEFAULTS);
+  const tbody = document.getElementById("weights-tbody");
+
+  // Daily goal row at top
+  const goalRow = `<tr style="border-bottom:2px solid #3a4452;background:rgba(124,185,255,.05);">
+    <td style="padding:12px 12px;color:#7cb9ff;font-weight:800;">🎯 Daily Cover Goal</td>
+    <td style="padding:12px 12px;text-align:center;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+        <button onclick="adjustGoal(-5)" style="background:#252c35;border:1px solid #3a4452;border-radius:6px;color:#7cb9ff;font-size:.9rem;cursor:pointer;padding:2px 10px;line-height:1.4;">−</button>
+        <input id="w-daily-goal" type="number" value="${DAILY_GOAL}" step="5" min="10" max="500"
+          style="background:#252c35;border:1px solid #7cb9ff;border-radius:6px;color:#7cb9ff;font-size:1rem;font-weight:800;padding:4px 8px;width:80px;text-align:center;outline:none;"
+          oninput="DAILY_GOAL=parseInt(this.value)||90"/>
+        <button onclick="adjustGoal(5)" style="background:#252c35;border:1px solid #3a4452;border-radius:6px;color:#7cb9ff;font-size:.9rem;cursor:pointer;padding:2px 10px;line-height:1.4;">+</button>
+      </div>
+    </td>
+    <td style="padding:12px 12px;color:#4a6280;font-size:.75rem;">covers / day</td>
+  </tr>`;
+
+  tbody.innerHTML = goalRow + depts.map(dept => {
+    const val = DIFFICULTY[dept] !== undefined ? DIFFICULTY[dept] : DIFFICULTY_DEFAULTS[dept];
+    return `<tr style="border-bottom:1px solid #1e242c;">
+      <td style="padding:10px 12px;color:#e2eaf4;font-weight:600;">${dept}</td>
+      <td style="padding:10px 12px;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+          <button onclick="adjustWeight('${dept}',-0.01)" style="background:#252c35;border:1px solid #3a4452;border-radius:6px;color:#7cb9ff;font-size:.9rem;cursor:pointer;padding:2px 10px;line-height:1.4;">−</button>
+          <input id="w-${dept.replace(/[^a-zA-Z]/g,'_')}" type="number" value="${val}" step="0.01" min="0" max="5"
+            style="background:#252c35;border:1px solid #3a4452;border-radius:6px;color:#e2eaf4;font-size:.9rem;padding:4px 8px;width:70px;text-align:center;outline:none;"
+            oninput="previewWeight('${dept}', this.value)"
+            onfocus="this.style.borderColor='#7cb9ff'" onblur="this.style.borderColor='#3a4452'"/>
+          <button onclick="adjustWeight('${dept}',0.01)" style="background:#252c35;border:1px solid #3a4452;border-radius:6px;color:#7cb9ff;font-size:.9rem;cursor:pointer;padding:2px 10px;line-height:1.4;">+</button>
+        </div>
+      </td>
+      <td style="padding:10px 12px;color:#4a6280;font-size:.75rem;">default: ${DIFFICULTY_DEFAULTS[dept]}</td>
+    </tr>`;
+  }).join("");
+}
+
+function adjustGoal(delta) {
+  const input = document.getElementById('w-daily-goal');
+  const newVal = Math.max(10, (parseInt(input.value) || 90) + delta);
+  input.value = newVal;
+  DAILY_GOAL = newVal;
+}
+
+function adjustWeight(dept, delta) {
+  const key = dept.replace(/[^a-zA-Z]/g, '_');
+  const input = document.getElementById('w-' + key);
+  if (!input) return;
+  const newVal = Math.round((parseFloat(input.value) + delta) * 100) / 100;
+  if (newVal < 0) return;
+  input.value = newVal.toFixed(2);
+  previewWeight(dept, newVal);
+}
+
+function previewWeight(dept, val) {
+  DIFFICULTY[dept] = parseFloat(val) || 0;
+}
+
+function saveWeights() {
+  const status = document.getElementById("weights-status");
+  status.textContent = "Saving…";
+  const saves = [
+    db.ref("weights").set(DIFFICULTY),
+    db.ref("settings/daily_goal").set(DAILY_GOAL)
+  ];
+  Promise.all(saves).then(() => {
+    status.style.color = "#4caf7d";
+    status.textContent = "✓ Saved — changes live on all devices";
+    setTimeout(() => { status.textContent = ""; status.style.color = "#4a6280"; }, 3000);
+  }).catch(err => {
+    status.style.color = "#f44336";
+    status.textContent = "✗ Error: " + err.message;
+  });
+}
+
+function resetWeights() {
+  Object.assign(DIFFICULTY, DIFFICULTY_DEFAULTS);
+  buildWeightsEditor();
+  document.getElementById("weights-status").textContent = "Reset to defaults — click Save to persist";
+}
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") closeScoreboard();
+});
+
+function buildScoreboard() {
+  const weekDates = (function() {
+    const today = new Date();
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      return d.toLocaleDateString("en-CA");
+    });
+  })();
+
+  document.getElementById("score-week-label").textContent = weekDates[0] + " — " + weekDates[4];
+
+  db.ref("production_logs").once("value").then(function(snap) {
+    const empData = {};
+    snap.forEach(function(child) {
+      const v = child.val();
+      if (!weekDates.includes(v.date)) return;
+      if (!empData[v.employee]) empData[v.employee] = { qty: 0, score: 0, depts: {} };
+      const w = DIFFICULTY[v.department] || 1.0;
+      empData[v.employee].qty   += v.quantity;
+      empData[v.employee].score += v.quantity * w;
+      empData[v.employee].depts[v.department] = (empData[v.employee].depts[v.department] || 0) + v.quantity;
+    });
+
+    const sorted = Object.entries(empData)
+      .map(([name, d]) => ({
+        name,
+        qty: d.qty,
+        score: Math.round(d.score * 10) / 10,
+        depts: Object.entries(d.depts).sort((a,b) => b[1]-a[1])
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const medals = ["🥇","🥈","🥉"];
+    const maxScore = sorted[0]?.score || 1;
+
+    const tbody = document.getElementById("score-tbody");
+    tbody.innerHTML = sorted.map((e, i) => {
+      const rank   = medals[i] || `<span style="color:#4a6280;font-size:.8rem;">${i+1}</span>`;
+      const deptStr = e.depts.map(([d, q]) => `${q} ${d}`).join("<br>");
+      const barPct  = Math.round((e.score / maxScore) * 100);
+      const color   = i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#7cb9ff";
+      return `<tr style="border-bottom:1px solid #252c35;">
+        <td style="padding:10px 10px;font-size:1rem;text-align:center;">${rank}</td>
+        <td style="padding:10px 10px;font-weight:700;color:#e2eaf4;">${e.name}</td>
+        <td style="padding:10px 10px;color:#7a8fa8;font-size:.78rem;line-height:1.5;">${deptStr}</td>
+        <td style="padding:10px 10px;text-align:right;color:#7a8fa8;">${e.qty}</td>
+        <td style="padding:10px 10px;text-align:right;font-weight:800;color:${color};">${e.score}</td>
+        <td style="padding:10px 14px;width:80px;">
+          <div style="background:#252c35;border-radius:99px;height:4px;">
+            <div style="height:100%;border-radius:99px;background:${color};width:${barPct}%;"></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join("");
+  });
+}
+</script>
+
+</body>
+</html>
