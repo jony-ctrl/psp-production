@@ -2,114 +2,65 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>PSP — TV Display Rotator</title>
+<title>PSP TV Rotator</title>
 <style>
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   html, body { width:100vw; height:100vh; overflow:hidden; background:#000; }
-
-  .frame-wrap {
-    position: absolute; inset: 0;
-    transition: opacity 0.8s ease;
-  }
-  .frame-wrap.hidden { opacity: 0; pointer-events: none; }
-  .frame-wrap.visible { opacity: 1; }
-
-  iframe {
-    width: 100%; height: 100%;
-    border: none; display: block;
-  }
-
-  /* Progress bar at very bottom */
-  #progress-bar {
-    position: fixed; bottom: 0; left: 0;
-    height: 3px; background: rgba(255,255,255,.15);
-    width: 100%; z-index: 999;
-  }
-  #progress-fill {
-    height: 100%; width: 0%;
-    background: rgba(255,255,255,.4);
-    transition: width linear;
-  }
-
-  /* Small label showing which display is active */
-  #label {
-    position: fixed; bottom: 8px; right: 12px;
-    font-family: sans-serif; font-size: 11px;
-    color: rgba(255,255,255,.2);
-    z-index: 999; letter-spacing: .04em;
-    pointer-events: none;
-  }
+  iframe { width:100%; height:100%; border:none; display:block; }
+  #bar  { position:fixed; bottom:0; left:0; width:100%; height:4px; background:rgba(255,255,255,.08); z-index:9999; }
+  #fill { height:100%; width:0%; background:rgba(255,255,255,.35); transition:none; }
+  #lbl  { position:fixed; bottom:8px; right:12px; font-family:sans-serif; font-size:11px; color:rgba(255,255,255,.18); z-index:9999; letter-spacing:.04em; }
 </style>
 </head>
 <body>
 
-<div class="frame-wrap visible" id="wrap-0">
-  <iframe id="frame-0" src="https://pspsewinglog.netlify.app/display.html" title="Sewing Production"></iframe>
-</div>
-
-<div class="frame-wrap hidden" id="wrap-1">
-  <iframe id="frame-1" src="https://admin.pspfab.com/display/safety-covers?key=2i62gFEDfM1H58PEqimJYt7c" title="Safety Covers"></iframe>
-</div>
-
-<div id="progress-bar"><div id="progress-fill"></div></div>
-<div id="label">Sewing Production</div>
+<iframe id="frame" src="" title="Display"></iframe>
+<div id="bar"><div id="fill"></div></div>
+<div id="lbl"></div>
 
 <script>
   const DISPLAYS = [
-    { id: 0, label: "Sewing Production",  duration: 30 * 1000 }, // 30 sec
-    { id: 1, label: "Safety Covers",      duration: 30 * 1000 }, // 30 sec
+    { url: "https://pspsewinglog.netlify.app/display.html", label: "Sewing Production" },
+    { url: "https://admin.pspfab.com/display/safety-covers?key=2i62gFEDfM1H58PEqimJYt7c", label: "Safety Covers" }
   ];
+  const DURATION = 30000; // 30 seconds each
 
-  let current = 0;
-  let timer = null;
-  let startTime = null;
+  // Get current index from URL hash, default 0
+  let idx = parseInt(window.location.hash.replace("#","")) || 0;
+  if (idx >= DISPLAYS.length) idx = 0;
 
-  const fill  = document.getElementById("progress-fill");
-  const label = document.getElementById("label");
+  const frame = document.getElementById("frame");
+  const fill  = document.getElementById("fill");
+  const lbl   = document.getElementById("lbl");
 
-  function show(index) {
-    DISPLAYS.forEach((d, i) => {
-      document.getElementById("wrap-" + i).className =
-        "frame-wrap " + (i === index ? "visible" : "hidden");
-    });
-    label.textContent = DISPLAYS[index].label;
-    current = index;
-    startTimer(DISPLAYS[index].duration);
-  }
+  // Load current display
+  frame.src = DISPLAYS[idx].url;
+  lbl.textContent = DISPLAYS[idx].label;
 
-  function startTimer(duration) {
-    clearInterval(timer);
-    startTime = Date.now();
+  // Animate progress bar
+  requestAnimationFrame(() => {
+    fill.style.transition = `width ${DURATION}ms linear`;
+    fill.style.width = "100%";
+  });
 
-    // Animate progress bar
-    fill.style.transition = "none";
-    fill.style.width = "0%";
-    requestAnimationFrame(() => {
-      fill.style.transition = `width ${duration}ms linear`;
-      fill.style.width = "100%";
-    });
-
-    timer = setTimeout(() => {
-      const next = (current + 1) % DISPLAYS.length;
-      show(next);
-    }, duration);
-  }
+  // After duration, reload page with next index in hash
+  const nextIdx = (idx + 1) % DISPLAYS.length;
+  const timer = setTimeout(() => {
+    window.location.href = "rotator.html#" + nextIdx;
+  }, DURATION);
 
   // Keyboard shortcuts
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowRight" || e.key === " ") {
       clearTimeout(timer);
-      show((current + 1) % DISPLAYS.length);
+      window.location.href = "rotator.html#" + nextIdx;
     }
     if (e.key === "ArrowLeft") {
       clearTimeout(timer);
-      show((current - 1 + DISPLAYS.length) % DISPLAYS.length);
+      const prev = (idx - 1 + DISPLAYS.length) % DISPLAYS.length;
+      window.location.href = "rotator.html#" + prev;
     }
   });
-
-  // Start
-  show(0);
 </script>
 </body>
 </html>
